@@ -178,8 +178,10 @@ public final class SqlUtils {
 		}
 		try (Connection connection = getConnection()) {
 			String tableName = getTableNameForAppid(appid);
-			connection.createStatement()
-					.execute(Utils.formatMessage("CREATE TABLE IF NOT EXISTS {0} ({1})", tableName, TABLE_SCHEMA));
+			connection.createStatement().execute(Utils.formatMessage(
+							"CREATE TABLE IF NOT EXISTS {0} ({1})",
+							tableName,
+							TABLE_SCHEMA));
 			logger.info("Created SQL database table named '{}'.", tableName);
 			return true;
 		} catch (Exception e) {
@@ -274,13 +276,13 @@ public final class SqlUtils {
 			String tableName = getTableNameForAppid(appid);
 			PreparedStatement ps;
 			if (useMySqlSyntax) {
-				ps = connection.prepareStatement(Utils.formatMessage("INSERT INTO {0} VALUES (?,?,?,?,?,?) " +
-						"ON DUPLICATE KEY UPDATE {1}=?,{2}=?",
+				ps = connection.prepareStatement(Utils.formatMessage(
+						"INSERT INTO {0} VALUES (?,?,?,?,?,?) ON DUPLICATE KEY UPDATE {1}=?,{2}=?",
 						tableName,
 						Config._UPDATED,
 						JSON_FIELD_NAME));
 			} else {
-				ps = connection.prepareStatement("MERGE INTO " + tableName +	" VALUES (?,?,?,?,?,?)");
+				ps = connection.prepareStatement("MERGE INTO " + tableName + " VALUES (?,?,?,?,?,?)");
 			}
 
 			for (P object : objects) {
