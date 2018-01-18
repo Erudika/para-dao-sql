@@ -53,15 +53,16 @@ This tells Para to use the SqlDAO Data Access Object (DAO) implementation instea
 #### Setting the SQL URL
 The environment variable `para.sql.url` is required and provides the URL to connect to the SQL database. 
 The SQL DAO uses JDBC and will prefix your URL with the JDBC protocol, so you don't need to include the JDBC
-protocol in your URL. For example, to connect to a MySQL server with URL `mysql://localhost:3306`,
-The SQL DAO will prefix this URL with the JDBC protocol to form the full URL `jdbc:mysql://localhost:3306`.
+protocol in your URL path. For example, to connect to a MySQL server with URL `mysql://localhost:3306`,
+the SQL DAO will prefix this URL with the JDBC protocol to form the full URL `jdbc:mysql://localhost:3306`.
 
-The URL you specify should also include in the path the database to be used by Para. The SQL DAO will not
-automatically create a database for you, so you must use an existing database. For example, you cannot simply 
-specify the URL to your MySQL cluster/server (`mysql://localhost:3306`), but rather you need to specify
-the path to an existing database (`mysql://localhost:3306/para`). Note that the user name and password you
-provide with `para.sql.user` and `para.sql.password` should correspond to the specific database you
-specify in the URL.
+The URL you specify should also include in it's path the database to be used by Para. The SQL DAO will not
+automatically create a **database** for you (though Para _does_ create **tables** within your database automatically), 
+so you must use an existing database. For example, you cannot simply specify the URL to your MySQL cluster/server 
+(`mysql://localhost:3306`), but rather you need to specify the path to an existing database 
+(`mysql://localhost:3306/para`). Note that the user name and password you provide with `para.sql.user` and 
+`para.sql.password` should correspond to the specific database you specify in the URL, and that user should have
+complete permissions within that database.
 
 
 #### Configuring a SQL Driver
