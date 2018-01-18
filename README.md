@@ -38,32 +38,42 @@ WAR file `para-x.y.z.war`. Para will look for plugins inside `lib` and pick up t
 
 Here are all the configuration properties for this plugin (these go inside your `application.conf`):
 ```ini
+para.sql.driver = "com.mysql.jdbc.Driver"
 para.sql.url = "mysql://localhost:3306"
 para.sql.user = "user"
 para.sql.password = "secret"
 ```
-Finally, set the config property:
-```
+Finally, set the DAO config property:
+```ini
 para.dao = "SqlDAO"
 ```
 This could be a Java system property or part of a `application.conf` file on the classpath.
 This tells Para to use the SqlDAO Data Access Object (DAO) implementation instead of the default.
 
 #### Setting the SQL URL
-The environment variable ```para.sql.url``` provides the URL to connect to the SQL database. The SQL DAO uses JDBC and 
-will prefix your URL with the JDBC protocol. For example, to connect to a MySQL server with URL ```mysql://localhost:3306```,
-The SQL DAO will prefix this URL with the JDBC protocol to form the full URL ```jdbc:mysql://localhost:3306```.
+The environment variable `para.sql.url` is required and provides the URL to connect to the SQL database. 
+The SQL DAO uses JDBC and will prefix your URL with the JDBC protocol, so you don't need to include the JDBC
+protocol in your URL. For example, to connect to a MySQL server with URL `mysql://localhost:3306`,
+The SQL DAO will prefix this URL with the JDBC protocol to form the full URL `jdbc:mysql://localhost:3306`.
+
+The URL you specify should also include in the path the database to be used by Para. The SQL DAO will not
+automatically create a database for you, so you must use an existing database. For example, you cannot simply 
+specify the URL to your MySQL cluster/server (`mysql://localhost:3306`), but rather you need to specify
+the path to an existing database (`mysql://localhost:3306/para`). Note that the user name and password you
+provide with `para.sql.user` and `para.sql.password` should correspond to the specific database you
+specify in the URL.
 
 
 #### Configuring a SQL Driver
 The SQL DAO uses JDBC to connect to your SQL database, which means a SQL driver (java.sql.Driver) will be needed for 
-your chosen flavor of SQL (for example, ```com.mysql.jdbc.Driver``` is used for MySQL). The version of JDBC used in 
-the SQL DAO will automatically detect SQL Drivers in your classpath when launching Para Server, so all you need to
-do is download the jarfile containing the SQL driver corresponding to your database and ensure it's part of the
-classpath when launching Para Server.
+your chosen flavor of SQL (for example, `com.mysql.jdbc.Driver` is used for MySQL).  You must specify the
+fully-qualified class name for your SQL driver. Upon initialization, the SQL DAO will attempt to load this driver
+and verify that it exists in the classpath. If the driver cannot be found, the SQL DAO will fail to initiailize and
+the DAO cannot be used.
 
-There is no need to directly specify the SQL driver as part of your configuration, as JDBC will infer
-the driver used by the protocol specified in your URL.
+In addition to specifying the driver name, you need to ensure the jarfile containing the SQL driver corresponding to
+your database is on your classpath when launching Para Server. The easiest way to do this is to add your SQL driver's
+jarfile to the `lib/` directory relative to the location of the Para Server WAR file `para-x.y.z.war`.
 
 ### Dependencies
 
