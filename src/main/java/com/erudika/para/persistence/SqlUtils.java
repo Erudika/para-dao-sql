@@ -32,6 +32,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.sql.Connection;
+import java.sql.DriverManager;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
@@ -52,8 +53,25 @@ import java.util.HashMap;
 public final class SqlUtils {
 
 	private static final Logger logger = LoggerFactory.getLogger(SqlUtils.class);
+	private static boolean useMySqlSyntax = false;
 
 	private static HikariDataSource hikariDataSource;
+	private static final String JSON_FIELD_NAME = "json";
+	private static final String SQL_SCHEMA = Utils.formatMessage(
+		"{0} NVARCHAR(64) PRIMARY KEY NOT NULL," +
+		"{1} NVARCHAR(64) NOT NULL," +
+		"{2} NVARCHAR(64) DEFAULT NULL," +
+		"{3} TIMESTAMP NOT NULL," +
+		"{4} TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP," +
+		"{5} LONGTEXT NOT NULL",
+		Config._ID,
+		Config._TYPE,
+		Config._CREATORID,
+		Config._TIMESTAMP,
+		Config._UPDATED,
+		JSON_FIELD_NAME
+	);
+
 	private SqlUtils() { }
 
 	/**
@@ -65,10 +83,40 @@ public final class SqlUtils {
 			return hikariDataSource.getConnection();
 		}
 
+		String sqlUrl = Config.getConfigParam("sql.url", null);
+		String sqlDriver = Config.getConfigParam("sql.driver", null);
+		String sqlUser = Config.getConfigParam("sql.user", "user");
+		String sqlPassword = Config.getConfigParam("sql.password", "secret");
+
+		if (StringUtils.isBlank(sqlUrl)) {
+			logger.error("Missing required configuration parameter \"para.sql.url\" for the SqlDAO");
+		}
+		if (Config.getConfigParam("sql.driver", null) == null) {
+			logger.error("Missing requiredconfiguration parameter \"para.sql.driver\" for the SqlDAO");
+		}
+
+		// verify the SQL driver can be loaded from the classpath
+		try {
+			Class.forName(sqlDriver);
+			useMySqlSyntax = sqlDriver.contains("mysql");
+		} catch (ClassNotFoundException e) {
+			throw new IllegalStateException("Error loading SQL driver \"{" + sqlDriver + "}\", class not found.");
+		}
+
+		// verify a connection can be made to the SQL server
+		try {
+			Connection conn = DriverManager.getConnection("jdbc:" + sqlUrl, sqlUser, sqlPassword);
+			conn.close();
+		} catch (SQLException e) {
+			throw new IllegalStateException("Failed to connect to SQL database: " + e.getMessage());
+		}
+
+		// connection and driver are valid, so establish a connection pool
 		HikariConfig hikariConfig = new HikariConfig();
-		hikariConfig.setJdbcUrl("jdbc:" + Config.getConfigParam("sql.url", null));
-		hikariConfig.setUsername(Config.getConfigParam("sql.user", "user"));
-		hikariConfig.setPassword(Config.getConfigParam("sql.password", "secret"));
+		hikariConfig.setJdbcUrl("jdbc:" + sqlUrl);
+		hikariConfig.setUsername(sqlUser);
+		hikariConfig.setPassword(sqlPassword);
+		hikariConfig.setDriverClassName(sqlDriver);
 		/*
 		hikariConfig.addDataSourceProperty("cachePrepStmts", Config.getConfigBoolean("sql.cachePrepStmts"), true);
 		hikariConfig.addDataSourceProperty("prepStmtCacheSize", Config.getConfigInt("sql.prepStmtCacheSize"), 500);
@@ -120,7 +168,7 @@ public final class SqlUtils {
 				return name != null;
 			}
 		} catch (Exception e) {
-			logger.error("Failed to check if table exists for appid '{}'", appid, logSqlError(e));
+			logger.error("Failed to check if table exists for appid '{}'{}", appid, logSqlError(e));
 		}
 		return false;
 	}
@@ -137,14 +185,12 @@ public final class SqlUtils {
 		try (Connection connection = getConnection()) {
 			String tableName = getTableNameForAppid(appid);
 			Statement statement = connection.createStatement();
-			String sql = Utils.formatMessage("CREATE TABLE IF NOT EXISTS {0} ({1} NVARCHAR PRIMARY KEY,"
-					+ "{2} NVARCHAR,{3} NVARCHAR,{4} TIMESTAMP,{5} TIMESTAMP,json NVARCHAR(MAX))",
-					tableName, Config._ID, Config._TYPE, Config._CREATORID, Config._TIMESTAMP, Config._UPDATED);
+			String sql = Utils.formatMessage("CREATE TABLE IF NOT EXISTS {0} ({1})", tableName, SQL_SCHEMA);
 			statement.execute(sql);
 			logger.info("Created SQL database table named '{}'.", tableName);
 			return true;
 		} catch (Exception e) {
-			logger.error("Failed to create a new table for appid '{}' in the SQL database", appid, logSqlError(e));
+			logger.error("Failed to create a new table for appid '{}' in the SQL database{}", appid, logSqlError(e));
 		}
 		return false;
 	}
@@ -164,7 +210,7 @@ public final class SqlUtils {
 			s.execute("DROP TABLE IF EXISTS " + tableName);
 			logger.info("Deleted table named '{}' from the SQL database.", tableName);
 		} catch (Exception e) {
-			logger.error("Failed to delete the table for appid '{}' in the SQL database", appid, logSqlError(e));
+			logger.error("Failed to delete the table for appid '{}' in the SQL database{}", appid, logSqlError(e));
 		}
 		return true;
 	}
@@ -197,10 +243,10 @@ public final class SqlUtils {
 		}
 		try (Connection connection = getConnection()) {
 			Map<String, P> results = new LinkedHashMap<>();
-			String table = getTableNameForAppid(appid);
+			String tableName = getTableNameForAppid(appid);
 			PreparedStatement p = connection.prepareStatement(
 					Utils.formatMessage("SELECT json FROM {0} WHERE {1} IN ({2})",
-					table, Config._ID, StringUtils.repeat("?", ",", ids.size())));
+							tableName, Config._ID, StringUtils.repeat("?", ",", ids.size())));
 			for (int i = 0; i < ids.size(); i++) {
 				p.setString(i + 1, ids.get(i));
 				results.put(ids.get(i), null);
@@ -214,7 +260,7 @@ public final class SqlUtils {
 			}
 			return results;
 		} catch (Exception e) {
-			logger.error("Failed to read rows for appid '{}' in the SQL database.", appid, logSqlError(e));
+			logger.error("Failed to read rows for appid '{}' in the SQL database{}", appid, logSqlError(e));
 		}
 		return Collections.emptyMap();
 	}
@@ -231,7 +277,19 @@ public final class SqlUtils {
 		}
 		try (Connection connection = getConnection()) {
 			String tableName = getTableNameForAppid(appid);
-			PreparedStatement p = connection.prepareStatement("MERGE INTO " + tableName +	" VALUES (?,?,?,?,?,?)");
+			String sql;
+			if (useMySqlSyntax) {
+				sql = Utils.formatMessage("INSERT INTO {0} VALUES (?,?,?,?,?,?) " +
+						"ON DUPLICATE KEY UPDATE {1}=?,{2}=?,{3}=?,{4}=?",
+						tableName,
+						Config._TYPE,
+						Config._CREATORID,
+						Config._UPDATED,
+						JSON_FIELD_NAME);
+			} else {
+				sql = "MERGE INTO " + tableName +	" VALUES (?,?,?,?,?,?)";
+			}
+			PreparedStatement p = connection.prepareStatement(sql);
 
 			for (P object : objects) {
 				if (StringUtils.isBlank(object.getId())) {
@@ -246,18 +304,32 @@ public final class SqlUtils {
 				p.setString(2, object.getType());
 				p.setString(3, object.getCreatorid());
 				p.setTimestamp(4, new Timestamp(object.getTimestamp()));
-				if (object.getUpdated() == null) {
+				final Timestamp updateTimetamp = object.getUpdated() == null ? null : new Timestamp(object.getUpdated());
+				if (updateTimetamp == null) {
 					p.setNull(5, Types.TIMESTAMP);
 				} else {
-					p.setTimestamp(5, new Timestamp(object.getUpdated()));
+					p.setTimestamp(5, updateTimetamp);
 				}
-				p.setString(6, ParaObjectUtils.getJsonWriterNoIdent().
-						writeValueAsString(ParaObjectUtils.getAnnotatedFields(object, false)));
+				final String objectJson = ParaObjectUtils.getJsonWriterNoIdent().
+						writeValueAsString(ParaObjectUtils.getAnnotatedFields(object, false));
+				p.setString(6, objectJson);
+
+				if (useMySqlSyntax) {
+					p.setString(7, object.getType());
+					p.setString(8, object.getCreatorid());
+					if (updateTimetamp == null) {
+						p.setNull(9, Types.TIMESTAMP);
+					} else {
+						p.setTimestamp(9, updateTimetamp);
+					}
+					p.setString(10, objectJson);
+				}
 				p.addBatch();
 			}
+			logger.info("statement:" + p.toString());
 			p.executeBatch();
 		} catch (Exception e) {
-			logger.error("Failed to create rows for appid '{}' in the SQL database.", appid, logSqlError(e), e);
+			logger.error("Failed to create rows for appid '{}' in the SQL database{}", appid, logSqlError(e), e);
 		}
 	}
 
@@ -310,7 +382,7 @@ public final class SqlUtils {
 			}
 			p.executeBatch();
 		} catch (Exception e) {
-			logger.error("Failed to update rows for appid '{}' in the SQL database.", appid, logSqlError(e));
+			logger.error("Failed to update rows for appid '{}' in the SQL database{}", appid, logSqlError(e));
 		}
 	}
 
@@ -334,7 +406,7 @@ public final class SqlUtils {
 			}
 			p.execute();
 		} catch (Exception e) {
-			logger.error("Failed to delete rows for appid '{}' in the SQL database.", appid, logSqlError(e));
+			logger.error("Failed to delete rows for appid '{}' in the SQL database{}", appid, logSqlError(e));
 		}
 	}
 
@@ -378,14 +450,14 @@ public final class SqlUtils {
 			}
 			return results;
 		} catch (Exception e) {
-			logger.error("Failed to scan a page for appid '{}' from the SQL database.", appid, logSqlError(e));
+			logger.error("Failed to scan a page for appid '{}' from the SQL database{}", appid, logSqlError(e));
 		}
 		return Collections.emptyList();
 	}
 
 	private static String logSqlError(Exception e) {
 		if (e == null || !SQLException.class.isAssignableFrom(e.getClass())) {
-			return null;
+			return "";
 		}
 		SQLException sqlException = (SQLException) e;
 		return " (Error Code: " + sqlException.getErrorCode() + ", SQLState: " + sqlException.getSQLState() + ")";
