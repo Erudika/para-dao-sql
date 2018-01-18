@@ -37,6 +37,7 @@ public abstract class SqlDAOIT extends DAOTest {
 	public SqlDAOIT(String mode) {
 		super(new SqlDAO());
 		org.h2.Driver.load();
+		System.setProperty("para.sql.driver", "org.h2.Driver");
 		System.setProperty("para.sql.url", "h2:mem:test" + (StringUtils.isBlank(mode) ? "" : ";MODE=" + mode));
 		System.setProperty("para.sql.user", "user");
 		System.setProperty("para.sql.password", "password");

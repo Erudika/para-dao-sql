@@ -59,10 +59,10 @@ The SQL DAO will prefix this URL with the JDBC protocol to form the full URL ```
 The SQL DAO uses JDBC to connect to your SQL database, which means a SQL driver (java.sql.Driver) will be needed for 
 your chosen flavor of SQL (for example, ```com.mysql.jdbc.Driver``` is used for MySQL). The version of JDBC used in 
 the SQL DAO will automatically detect SQL Drivers in your classpath when launching Para Server, so all you need to
-do is download the jarfile containing the SQL driver corresponding with your server and ensure it's part of the
+do is download the jarfile containing the SQL driver corresponding to your database and ensure it's part of the
 classpath when launching Para Server.
 
-There is no need to directly specify the driver (java.sql.Driver) as part of your configuration, as JDBC will infer
+There is no need to directly specify the SQL driver as part of your configuration, as JDBC will infer
 the driver used by the protocol specified in your URL.
 
 ### Dependencies
