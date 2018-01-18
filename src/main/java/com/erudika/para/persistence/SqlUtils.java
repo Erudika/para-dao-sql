@@ -117,12 +117,6 @@ public final class SqlUtils {
 		hikariConfig.setUsername(sqlUser);
 		hikariConfig.setPassword(sqlPassword);
 		hikariConfig.setDriverClassName(sqlDriver);
-		/*
-		hikariConfig.addDataSourceProperty("cachePrepStmts", Config.getConfigBoolean("sql.cachePrepStmts"), true);
-		hikariConfig.addDataSourceProperty("prepStmtCacheSize", Config.getConfigInt("sql.prepStmtCacheSize"), 500);
-		hikariConfig.addDataSourceProperty("prepStmtCacheSqlLimit", Config.getConfigInt("sql.prepStmtCacheSqlLimit"), 2048);
-		hikariConfig.addDataSourceProperty("useServerPrepStmts", Config.getConfigBoolean("sql.useServerPrepStmts", true));
-		*/
 		hikariDataSource = new HikariDataSource(hikariConfig);
 
 		if (!existsTable(Config.getRootAppIdentifier())) {
