@@ -124,7 +124,9 @@ public class SqlDAO implements DAO {
 	@Override
 	@SuppressWarnings("unchecked")
 	public <P extends ParaObject> List<P> readPage(String appid, Pager pager) {
-		return SqlUtils.scanRows(appid, pager);
+		List<P> results = SqlUtils.readPage(appid, pager);
+		logger.debug("SqlDAO.readPage() {}", results.size());
+		return results;
 	}
 
 	@Override

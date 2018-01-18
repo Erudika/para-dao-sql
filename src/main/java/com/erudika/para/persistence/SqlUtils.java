@@ -53,11 +53,8 @@ import java.util.HashMap;
 public final class SqlUtils {
 
 	private static final Logger logger = LoggerFactory.getLogger(SqlUtils.class);
-	private static boolean useMySqlSyntax = false;
-
-	private static HikariDataSource hikariDataSource;
 	private static final String JSON_FIELD_NAME = "json";
-	private static final String SQL_SCHEMA = Utils.formatMessage(
+	private static final String TABLE_SCHEMA = Utils.formatMessage(
 		"{0} NVARCHAR(64) PRIMARY KEY NOT NULL," +
 		"{1} NVARCHAR(64) NOT NULL," +
 		"{2} NVARCHAR(64) DEFAULT NULL," +
@@ -71,6 +68,9 @@ public final class SqlUtils {
 		Config._UPDATED,
 		JSON_FIELD_NAME
 	);
+
+	private static HikariDataSource hikariDataSource;
+	private static boolean useMySqlSyntax = false;
 
 	private SqlUtils() { }
 
@@ -92,7 +92,7 @@ public final class SqlUtils {
 			logger.error("Missing required configuration parameter \"para.sql.url\" for the SqlDAO");
 		}
 		if (Config.getConfigParam("sql.driver", null) == null) {
-			logger.error("Missing requiredconfiguration parameter \"para.sql.driver\" for the SqlDAO");
+			logger.error("Missing required configuration parameter \"para.sql.driver\" for the SqlDAO");
 		}
 
 		// verify the SQL driver can be loaded from the classpath
@@ -100,7 +100,8 @@ public final class SqlUtils {
 			Class.forName(sqlDriver);
 			useMySqlSyntax = sqlDriver.contains("mysql");
 		} catch (ClassNotFoundException e) {
-			throw new IllegalStateException("Error loading SQL driver \"{" + sqlDriver + "}\", class not found.");
+			logger.error("Error loading SQL driver \"" + sqlDriver + "\", class not found.");
+			return null;
 		}
 
 		// verify a connection can be made to the SQL server
@@ -108,7 +109,8 @@ public final class SqlUtils {
 			Connection conn = DriverManager.getConnection("jdbc:" + sqlUrl, sqlUser, sqlPassword);
 			conn.close();
 		} catch (SQLException e) {
-			throw new IllegalStateException("Failed to connect to SQL database: " + e.getMessage());
+			logger.error("Failed to connect to SQL database: " + e.getMessage());
+			return null;
 		}
 
 		// connection and driver are valid, so establish a connection pool
@@ -159,10 +161,10 @@ public final class SqlUtils {
 			return false;
 		}
 		try (Connection connection = getConnection()) {
-			PreparedStatement statement = connection.prepareStatement(
+			PreparedStatement ps = connection.prepareStatement(
 					"SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = ?");
-			statement.setString(1, getTableNameForAppid(appid).toUpperCase());
-			ResultSet res = statement.executeQuery();
+			ps.setString(1, getTableNameForAppid(appid).toUpperCase());
+			ResultSet res = ps.executeQuery();
 			if (res.next()) {
 				String name = res.getString(1);
 				return name != null;
@@ -184,9 +186,8 @@ public final class SqlUtils {
 		}
 		try (Connection connection = getConnection()) {
 			String tableName = getTableNameForAppid(appid);
-			Statement statement = connection.createStatement();
-			String sql = Utils.formatMessage("CREATE TABLE IF NOT EXISTS {0} ({1})", tableName, SQL_SCHEMA);
-			statement.execute(sql);
+			connection.createStatement()
+					.execute(Utils.formatMessage("CREATE TABLE IF NOT EXISTS {0} ({1})", tableName, TABLE_SCHEMA));
 			logger.info("Created SQL database table named '{}'.", tableName);
 			return true;
 		} catch (Exception e) {
@@ -206,8 +207,7 @@ public final class SqlUtils {
 		}
 		try (Connection connection = getConnection()) {
 			String tableName = getTableNameForAppid(appid);
-			Statement s = connection.createStatement();
-			s.execute("DROP TABLE IF EXISTS " + tableName);
+			connection.createStatement().execute("DROP TABLE IF EXISTS " + tableName);
 			logger.info("Deleted table named '{}' from the SQL database.", tableName);
 		} catch (Exception e) {
 			logger.error("Failed to delete the table for appid '{}' in the SQL database{}", appid, logSqlError(e));
@@ -244,14 +244,17 @@ public final class SqlUtils {
 		try (Connection connection = getConnection()) {
 			Map<String, P> results = new LinkedHashMap<>();
 			String tableName = getTableNameForAppid(appid);
-			PreparedStatement p = connection.prepareStatement(
-					Utils.formatMessage("SELECT json FROM {0} WHERE {1} IN ({2})",
-							tableName, Config._ID, StringUtils.repeat("?", ",", ids.size())));
+			PreparedStatement ps = connection.prepareStatement(Utils.formatMessage(
+					"SELECT {0} FROM {1} WHERE {2} IN ({3})",
+					JSON_FIELD_NAME,
+					tableName,
+					Config._ID,
+					StringUtils.repeat("?", ",", ids.size())));
 			for (int i = 0; i < ids.size(); i++) {
-				p.setString(i + 1, ids.get(i));
+				ps.setString(i + 1, ids.get(i));
 				results.put(ids.get(i), null);
 			}
-			ResultSet res = p.executeQuery();
+			ResultSet res = ps.executeQuery();
 			while (res.next()) {
 				P obj = ParaObjectUtils.fromJSON(res.getString(1));
 				if (obj != null) {
@@ -277,19 +280,16 @@ public final class SqlUtils {
 		}
 		try (Connection connection = getConnection()) {
 			String tableName = getTableNameForAppid(appid);
-			String sql;
+			PreparedStatement ps;
 			if (useMySqlSyntax) {
-				sql = Utils.formatMessage("INSERT INTO {0} VALUES (?,?,?,?,?,?) " +
-						"ON DUPLICATE KEY UPDATE {1}=?,{2}=?,{3}=?,{4}=?",
+				ps = connection.prepareStatement(Utils.formatMessage("INSERT INTO {0} VALUES (?,?,?,?,?,?) " +
+						"ON DUPLICATE KEY UPDATE {1}=?,{2}=?",
 						tableName,
-						Config._TYPE,
-						Config._CREATORID,
 						Config._UPDATED,
-						JSON_FIELD_NAME);
+						JSON_FIELD_NAME));
 			} else {
-				sql = "MERGE INTO " + tableName +	" VALUES (?,?,?,?,?,?)";
+				ps = connection.prepareStatement("MERGE INTO " + tableName +	" VALUES (?,?,?,?,?,?)");
 			}
-			PreparedStatement p = connection.prepareStatement(sql);
 
 			for (P object : objects) {
 				if (StringUtils.isBlank(object.getId())) {
@@ -299,35 +299,26 @@ public final class SqlUtils {
 					object.setTimestamp(Utils.timestamp());
 				}
 				object.setAppid(appid);
-
-				p.setString(1, object.getId());
-				p.setString(2, object.getType());
-				p.setString(3, object.getCreatorid());
-				p.setTimestamp(4, new Timestamp(object.getTimestamp()));
-				final Timestamp updateTimetamp = object.getUpdated() == null ? null : new Timestamp(object.getUpdated());
-				if (updateTimetamp == null) {
-					p.setNull(5, Types.TIMESTAMP);
-				} else {
-					p.setTimestamp(5, updateTimetamp);
-				}
+				final Timestamp createTimestamp = object.getTimestamp() == null ?
+						new Timestamp(System.currentTimeMillis()) : new Timestamp(object.getTimestamp());
+				final Timestamp updateTimestamp = object.getUpdated() == null ?
+						createTimestamp : new Timestamp(object.getUpdated());
 				final String objectJson = ParaObjectUtils.getJsonWriterNoIdent().
 						writeValueAsString(ParaObjectUtils.getAnnotatedFields(object, false));
-				p.setString(6, objectJson);
 
+				ps.setString(1, object.getId());
+				ps.setString(2, object.getType());
+				ps.setString(3, object.getCreatorid());
+				ps.setTimestamp(4, createTimestamp);
+				ps.setTimestamp(5, updateTimestamp);
+				ps.setString(6, objectJson);
 				if (useMySqlSyntax) {
-					p.setString(7, object.getType());
-					p.setString(8, object.getCreatorid());
-					if (updateTimetamp == null) {
-						p.setNull(9, Types.TIMESTAMP);
-					} else {
-						p.setTimestamp(9, updateTimetamp);
-					}
-					p.setString(10, objectJson);
+					ps.setTimestamp(7, updateTimestamp);
+					ps.setString(8, objectJson);
 				}
-				p.addBatch();
+				ps.addBatch();
 			}
-			logger.info("statement:" + p.toString());
-			p.executeBatch();
+			ps.executeBatch();
 		} catch (Exception e) {
 			logger.error("Failed to create rows for appid '{}' in the SQL database{}", appid, logSqlError(e), e);
 		}
@@ -354,11 +345,13 @@ public final class SqlUtils {
 			}
 
 			Map<String, P> existingObjects = readRows(appid, new ArrayList<>(objectsMap.keySet()));
-			String sql = Utils.formatMessage("UPDATE {0} SET {1}=?,{2}=?,{3}=?,{4}=?,json=? "
-					+ "WHERE {5} = ?", tableName, Config._TYPE, Config._CREATORID,
-					Config._TIMESTAMP, Config._UPDATED, Config._ID);
 
-			PreparedStatement p = connection.prepareStatement(sql);
+			PreparedStatement ps = connection.prepareStatement(Utils.formatMessage(
+					"UPDATE {0} SET {1}=?,{2}=? WHERE {3} = ?",
+					tableName,
+					Config._UPDATED,
+					JSON_FIELD_NAME,
+					Config._ID));
 
 			for (P existingObject : existingObjects.values()) {
 				if (existingObject != null) {
@@ -366,21 +359,16 @@ public final class SqlUtils {
 					Map<String, Object> data = ParaObjectUtils.getAnnotatedFields(object, false);
 					P updated = ParaObjectUtils.setAnnotatedFields(existingObject, data, Locked.class);
 
-					p.setString(1, updated.getType());
-					p.setString(2, updated.getCreatorid());
-					if (updated.getTimestamp() == null) {
-						p.setNull(3, Types.TIMESTAMP);
-					} else {
-						p.setTimestamp(3, new Timestamp(updated.getTimestamp()));
-					}
-					p.setTimestamp(4, new Timestamp(updated.getUpdated()));
-					p.setString(5, ParaObjectUtils.getJsonWriterNoIdent().
+					final Timestamp updateTimestamp = object.getUpdated() == null ?
+							new Timestamp(System.currentTimeMillis()) : new Timestamp(object.getUpdated());
+					ps.setTimestamp(1, updateTimestamp);
+					ps.setString(2, ParaObjectUtils.getJsonWriterNoIdent().
 							writeValueAsString(ParaObjectUtils.getAnnotatedFields(updated, false)));
-					p.setString(6, updated.getId());
-					p.addBatch();
+					ps.setString(3, updated.getId());
+					ps.addBatch();
 				}
 			}
-			p.executeBatch();
+			ps.executeBatch();
 		} catch (Exception e) {
 			logger.error("Failed to update rows for appid '{}' in the SQL database{}", appid, logSqlError(e));
 		}
@@ -398,26 +386,28 @@ public final class SqlUtils {
 		}
 		try (Connection connection = getConnection()) {
 			String tableName = getTableNameForAppid(appid);
-			PreparedStatement p = connection.prepareStatement(
-					Utils.formatMessage("DELETE FROM {0} WHERE {1} IN ({2})",
-					tableName, Config._ID, StringUtils.repeat("?", ",", objects.size())));
+			PreparedStatement ps = connection.prepareStatement(Utils.formatMessage(
+					"DELETE FROM {0} WHERE {1} IN ({2})",
+					tableName,
+					Config._ID,
+					StringUtils.repeat("?", ",", objects.size())));
 			for (int i = 0; i < objects.size(); i++) {
-				p.setString(i + 1, objects.get(i).getId());
+				ps.setString(i + 1, objects.get(i).getId());
 			}
-			p.execute();
+			ps.execute();
 		} catch (Exception e) {
 			logger.error("Failed to delete rows for appid '{}' in the SQL database{}", appid, logSqlError(e));
 		}
 	}
 
 	/**
-	 * Scans the DB one page at a time.
+	 * Reads one page from the DB.
 	 * @param <P> type of object
 	 * @param appid app id
 	 * @param pager a {@link Pager}
 	 * @return a list of ParaObjects
 	 */
-	protected static <P extends ParaObject> List<P> scanRows(String appid, Pager pager) {
+	protected static <P extends ParaObject> List<P> readPage(String appid, Pager pager) {
 		if (StringUtils.isBlank(appid)) {
 			return Collections.emptyList();
 		}
@@ -426,10 +416,13 @@ public final class SqlUtils {
 		}
 		try (Connection connection = getConnection()) {
 			List<P> results = new ArrayList<>(pager.getLimit());
-			String tableName = getTableNameForAppid(appid);
 			int start = pager.getPage() <= 1 ? 0 : (int) (pager.getPage() - 1) * pager.getLimit();
-			PreparedStatement p = connection.prepareStatement(
-					"SELECT ROWNUM(), json FROM (SELECT json FROM " + tableName + ") WHERE ROWNUM() > ? LIMIT ?");
+			String tableName = getTableNameForAppid(appid);
+			PreparedStatement p = connection.prepareStatement(Utils.formatMessage(
+					"SELECT ROWNUM(), {0} FROM (SELECT {1} FROM {2}) WHERE ROWNUM() > ? LIMIT ?",
+					JSON_FIELD_NAME,
+					JSON_FIELD_NAME,
+					tableName));
 			p.setInt(1, start);
 			p.setInt(2, pager.getLimit());
 			ResultSet res = p.executeQuery();
@@ -450,7 +443,7 @@ public final class SqlUtils {
 			}
 			return results;
 		} catch (Exception e) {
-			logger.error("Failed to scan a page for appid '{}' from the SQL database{}", appid, logSqlError(e));
+			logger.error("Failed to read page for appid '{}' from the SQL database{}", appid, logSqlError(e));
 		}
 		return Collections.emptyList();
 	}
@@ -461,35 +454,5 @@ public final class SqlUtils {
 		}
 		SQLException sqlException = (SQLException) e;
 		return " (Error Code: " + sqlException.getErrorCode() + ", SQLState: " + sqlException.getSQLState() + ")";
-	}
-
-	private static void closeResultSet(ResultSet res) {
-		if (res != null) {
-			try {
-				res.close();
-			} catch (Exception e) {
-				logger.warn("Failed to close result set: ", e.getMessage());
-			}
-		}
-	}
-
-	private static void closeStatement(Statement stat) {
-		if (stat != null) {
-			try {
-				stat.close();
-			} catch (Exception e) {
-				logger.warn("Failed to close statement: ", e.getMessage());
-			}
-		}
-	}
-
-	private static void closeConnection(Connection conn) {
-		if (conn != null) {
-			try {
-				conn.close();
-			} catch (Exception e) {
-				logger.warn("Failed to close connection to DB server: ", e.getMessage());
-			}
-		}
 	}
 }
