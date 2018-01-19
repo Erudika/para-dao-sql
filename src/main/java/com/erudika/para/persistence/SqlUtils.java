@@ -447,6 +447,7 @@ public final class SqlUtils {
 			return "";
 		}
 		SQLException sqlException = (SQLException) e;
-		return " (Error Code: " + sqlException.getErrorCode() + ", SQLState: " + sqlException.getSQLState() + ")";
+		return " [" + e.getMessage() + " (Error Code: " + sqlException.getErrorCode() +
+				", SQLState: " + sqlException.getSQLState() + ")]";
 	}
 }
