@@ -52,23 +52,10 @@ public final class SqlUtils {
 
 	private static final Logger logger = LoggerFactory.getLogger(SqlUtils.class);
 	private static final String JSON_FIELD_NAME = "json";
-	private static final String TABLE_SCHEMA = Utils.formatMessage(
-		"{0} NVARCHAR(64) PRIMARY KEY NOT NULL," +
-		"{1} NVARCHAR(64) NOT NULL," +
-		"{2} NVARCHAR(64) DEFAULT NULL," +
-		"{3} TIMESTAMP NOT NULL," +
-		"{4} TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP," +
-		"{5} LONGTEXT NOT NULL",
-		Config._ID,
-		Config._TYPE,
-		Config._CREATORID,
-		Config._TIMESTAMP,
-		Config._UPDATED,
-		JSON_FIELD_NAME
-	);
-
 	private static HikariDataSource hikariDataSource;
 	private static boolean useMySqlSyntax = false;
+	private static boolean useMSSqlSyntax = false;
+	private static boolean usePGSqlSyntax = false;
 
 	private SqlUtils() { }
 
@@ -97,6 +84,8 @@ public final class SqlUtils {
 		try {
 			Class.forName(sqlDriver);
 			useMySqlSyntax = sqlDriver.contains("mysql");
+			useMSSqlSyntax = sqlDriver.contains("sqlserver");
+			usePGSqlSyntax = sqlDriver.contains("postgresql");
 		} catch (ClassNotFoundException e) {
 			logger.error("Error loading SQL driver \"" + sqlDriver + "\", class not found.");
 			return null;
@@ -143,6 +132,25 @@ public final class SqlUtils {
 		}
 	}
 
+	private static String getTableSchema() {
+		return Utils.formatMessage(
+			"{0} {6} PRIMARY KEY NOT NULL,"
+			+ "{1} {6} NOT NULL,"
+			+ "{2} {6} DEFAULT NULL,"
+			+ "{3} TIMESTAMP NOT NULL,"
+			+ "{4} TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,"
+			+ "{5} TEXT NOT NULL",
+			Config._ID,
+			Config._TYPE,
+			Config._CREATORID,
+			Config._TIMESTAMP,
+			Config._UPDATED,
+			JSON_FIELD_NAME,
+			useMSSqlSyntax ? "NVARCHAR(2048)" :
+					(useMySqlSyntax ? "VARCHAR(2048) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci" : "VARCHAR(2048)")
+		);
+	}
+
 	/**
 	 * Checks if a specific table exists in the SQL database.
 	 * @param appid name of the {@link com.erudika.para.core.App}
@@ -179,9 +187,10 @@ public final class SqlUtils {
 		try (Connection connection = getConnection()) {
 			String tableName = getTableNameForAppid(appid);
 			connection.createStatement().execute(Utils.formatMessage(
-							"CREATE TABLE IF NOT EXISTS {0} ({1})",
+							"CREATE TABLE IF NOT EXISTS {0} ({1}){2}",
 							tableName,
-							TABLE_SCHEMA));
+							getTableSchema(),
+							useMySqlSyntax ? " CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci" : ""));
 			logger.info("Created SQL database table named '{}'.", tableName);
 			return true;
 		} catch (Exception e) {
@@ -274,16 +283,7 @@ public final class SqlUtils {
 		}
 		try (Connection connection = getConnection()) {
 			String tableName = getTableNameForAppid(appid);
-			PreparedStatement ps;
-			if (useMySqlSyntax) {
-				ps = connection.prepareStatement(Utils.formatMessage(
-						"INSERT INTO {0} VALUES (?,?,?,?,?,?) ON DUPLICATE KEY UPDATE {1}=?,{2}=?",
-						tableName,
-						Config._UPDATED,
-						JSON_FIELD_NAME));
-			} else {
-				ps = connection.prepareStatement("MERGE INTO " + tableName + " VALUES (?,?,?,?,?,?)");
-			}
+			PreparedStatement ps = getCreateRowPreparedStatement(connection, tableName);
 
 			for (P object : objects) {
 				if (StringUtils.isBlank(object.getId())) {
@@ -300,15 +300,22 @@ public final class SqlUtils {
 				final String objectJson = ParaObjectUtils.getJsonWriterNoIdent().
 						writeValueAsString(ParaObjectUtils.getAnnotatedFields(object, false));
 
-				ps.setString(1, object.getId());
-				ps.setString(2, object.getType());
-				ps.setString(3, object.getCreatorid());
-				ps.setTimestamp(4, createTimestamp);
-				ps.setTimestamp(5, updateTimestamp);
-				ps.setString(6, objectJson);
-				if (useMySqlSyntax) {
-					ps.setTimestamp(7, updateTimestamp);
-					ps.setString(8, objectJson);
+				int positionOffset = 0;
+				if (useMSSqlSyntax) {
+					positionOffset = 2;
+					ps.setTimestamp(1, updateTimestamp);
+					ps.setString(2, objectJson);
+				}
+
+				ps.setString(positionOffset + 1, object.getId());
+				ps.setString(positionOffset + 2, object.getType());
+				ps.setString(positionOffset + 3, object.getCreatorid());
+				ps.setTimestamp(positionOffset + 4, createTimestamp);
+				ps.setTimestamp(positionOffset + 5, updateTimestamp);
+				ps.setString(positionOffset + 6, objectJson);
+				if (useMySqlSyntax || usePGSqlSyntax) {
+					ps.setTimestamp(positionOffset + 7, updateTimestamp);
+					ps.setString(positionOffset + 8, objectJson);
 				}
 				ps.addBatch();
 			}
@@ -440,6 +447,31 @@ public final class SqlUtils {
 			logger.error("Failed to read page for appid '{}' from the SQL database{}", appid, logSqlError(e));
 		}
 		return Collections.emptyList();
+	}
+
+	private static PreparedStatement getCreateRowPreparedStatement(Connection conn, String tableName) throws SQLException {
+		PreparedStatement ps;
+		if (useMySqlSyntax) {
+			ps = conn.prepareStatement(Utils.formatMessage(
+					"INSERT INTO {0} VALUES (?,?,?,?,?,?) ON DUPLICATE KEY UPDATE {1}=?,{2}=?",
+					tableName,
+					Config._UPDATED,
+					JSON_FIELD_NAME));
+		} else if (usePGSqlSyntax) {
+			ps = conn.prepareStatement(Utils.formatMessage(
+					"INSERT INTO {0} VALUES (?,?,?,?,?,?) ON CONFLICT ({1}) DO UPDATE SET {2}=?,{3}=?",
+					tableName,
+					Config._ID,
+					Config._UPDATED,
+					JSON_FIELD_NAME));
+		} else if (useMSSqlSyntax) {
+			ps = conn.prepareStatement(Utils.formatMessage("MERGE INTO {0} AS T USING {0} AS S ON T.id = S.id "
+					+ "WHEN MATCHED THEN UPDATE SET {1}=?,{2}=? WHEN NOT MATCHED THEN INSERT "
+					+ "VALUES (?,?,?,?,?,?)", tableName, Config._UPDATED, JSON_FIELD_NAME));
+		} else {
+			ps = conn.prepareStatement("MERGE INTO " + tableName + " VALUES (?,?,?,?,?,?)");
+		}
+		return ps;
 	}
 
 	private static String logSqlError(Exception e) {
