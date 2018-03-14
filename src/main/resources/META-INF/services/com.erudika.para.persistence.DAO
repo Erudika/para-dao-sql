@@ -1,1 +1,2 @@
 com.erudika.para.persistence.SqlDAO
+com.erudika.para.persistence.H2DAO
