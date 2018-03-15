@@ -36,6 +36,7 @@ import java.sql.DriverManager;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.sql.Statement;
 import java.sql.Timestamp;
 import java.util.ArrayList;
 import java.util.List;
@@ -161,13 +162,18 @@ public final class SqlUtils {
 			return false;
 		}
 		try (Connection connection = getConnection()) {
-			PreparedStatement ps = connection.prepareStatement(
-					"SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = ?");
-			ps.setString(1, getTableNameForAppid(appid).toUpperCase());
-			ResultSet res = ps.executeQuery();
-			if (res.next()) {
-				String name = res.getString(1);
-				return name != null;
+			if (connection == null) {
+				return false;
+			}
+			try (PreparedStatement ps = connection.prepareStatement("SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES "
+					+ "WHERE TABLE_NAME = ?")) {
+				ps.setString(1, getTableNameForAppid(appid).toUpperCase());
+				try (ResultSet res = ps.executeQuery()) {
+					if (res.next()) {
+						String name = res.getString(1);
+						return name != null;
+					}
+				}
 			}
 		} catch (Exception e) {
 			logger.error("Failed to check if table exists for appid '{}'{}", appid, logSqlError(e));
@@ -185,12 +191,17 @@ public final class SqlUtils {
 			return false;
 		}
 		try (Connection connection = getConnection()) {
+			if (connection == null) {
+				return false;
+			}
 			String tableName = getTableNameForAppid(appid);
-			connection.createStatement().execute(Utils.formatMessage(
+			try	(Statement ps = connection.createStatement()) {
+				ps.execute(Utils.formatMessage(
 							"CREATE TABLE IF NOT EXISTS {0} ({1}){2}",
 							tableName,
 							getTableSchema(),
 							useMySqlSyntax ? " CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci" : ""));
+			}
 			logger.info("Created SQL database table named '{}'.", tableName);
 			return true;
 		} catch (Exception e) {
@@ -209,8 +220,13 @@ public final class SqlUtils {
 			return false;
 		}
 		try (Connection connection = getConnection()) {
+			if (connection == null) {
+				return false;
+			}
 			String tableName = getTableNameForAppid(appid);
-			connection.createStatement().execute("DROP TABLE IF EXISTS " + tableName);
+			try	(Statement ps = connection.createStatement()) {
+				ps.execute(Utils.formatMessage("DROP TABLE IF EXISTS {0}", tableName));
+			}
 			logger.info("Deleted table named '{}' from the SQL database.", tableName);
 		} catch (Exception e) {
 			logger.error("Failed to delete the table for appid '{}' in the SQL database{}", appid, logSqlError(e));
@@ -245,26 +261,29 @@ public final class SqlUtils {
 			return Collections.emptyMap();
 		}
 		try (Connection connection = getConnection()) {
+			if (connection == null) {
+				return Collections.emptyMap();
+			}
 			Map<String, P> results = new LinkedHashMap<>();
 			String tableName = getTableNameForAppid(appid);
-			PreparedStatement ps = connection.prepareStatement(Utils.formatMessage(
-					"SELECT {0} FROM {1} WHERE {2} IN ({3})",
-					JSON_FIELD_NAME,
-					tableName,
-					Config._ID,
-					StringUtils.repeat("?", ",", ids.size())));
-			for (int i = 0; i < ids.size(); i++) {
-				ps.setString(i + 1, ids.get(i));
-				results.put(ids.get(i), null);
-			}
-			ResultSet res = ps.executeQuery();
-			while (res.next()) {
-				P obj = ParaObjectUtils.fromJSON(res.getString(1));
-				if (obj != null) {
-					results.put(obj.getId(), obj);
+			try	(PreparedStatement ps = connection.prepareStatement(Utils.formatMessage(
+					"SELECT {0} FROM {1} WHERE {2} IN ({3})", JSON_FIELD_NAME, tableName, Config._ID,
+					StringUtils.repeat("?", ",", ids.size())))) {
+
+				for (int i = 0; i < ids.size(); i++) {
+					ps.setString(i + 1, ids.get(i));
+					results.put(ids.get(i), null);
+				}
+				try (ResultSet res = ps.executeQuery()) {
+					while (res.next()) {
+						P obj = ParaObjectUtils.fromJSON(res.getString(1));
+						if (obj != null) {
+							results.put(obj.getId(), obj);
+						}
+					}
+					return results;
 				}
 			}
-			return results;
 		} catch (Exception e) {
 			logger.error("Failed to read rows for appid '{}' in the SQL database{}", appid, logSqlError(e));
 		}
@@ -282,44 +301,47 @@ public final class SqlUtils {
 			return;
 		}
 		try (Connection connection = getConnection()) {
-			String tableName = getTableNameForAppid(appid);
-			PreparedStatement ps = getCreateRowPreparedStatement(connection, tableName);
-
-			for (P object : objects) {
-				if (StringUtils.isBlank(object.getId())) {
-					object.setId(Utils.getNewId());
-				}
-				if (object.getTimestamp() == null) {
-					object.setTimestamp(Utils.timestamp());
-				}
-				object.setAppid(appid);
-				final Timestamp createTimestamp = object.getTimestamp() == null ?
-						new Timestamp(System.currentTimeMillis()) : new Timestamp(object.getTimestamp());
-				final Timestamp updateTimestamp = object.getUpdated() == null ?
-						createTimestamp : new Timestamp(object.getUpdated());
-				final String objectJson = ParaObjectUtils.getJsonWriterNoIdent().
-						writeValueAsString(ParaObjectUtils.getAnnotatedFields(object, false));
-
-				int positionOffset = 0;
-				if (useMSSqlSyntax) {
-					positionOffset = 2;
-					ps.setTimestamp(1, updateTimestamp);
-					ps.setString(2, objectJson);
-				}
-
-				ps.setString(positionOffset + 1, object.getId());
-				ps.setString(positionOffset + 2, object.getType());
-				ps.setString(positionOffset + 3, object.getCreatorid());
-				ps.setTimestamp(positionOffset + 4, createTimestamp);
-				ps.setTimestamp(positionOffset + 5, updateTimestamp);
-				ps.setString(positionOffset + 6, objectJson);
-				if (useMySqlSyntax || usePGSqlSyntax) {
-					ps.setTimestamp(positionOffset + 7, updateTimestamp);
-					ps.setString(positionOffset + 8, objectJson);
-				}
-				ps.addBatch();
+			if (connection == null) {
+				return;
 			}
-			ps.executeBatch();
+			String tableName = getTableNameForAppid(appid);
+			try (PreparedStatement ps = getCreateRowPreparedStatement(connection, tableName)) {
+				for (P object : objects) {
+					if (StringUtils.isBlank(object.getId())) {
+						object.setId(Utils.getNewId());
+					}
+					if (object.getTimestamp() == null) {
+						object.setTimestamp(Utils.timestamp());
+					}
+					object.setAppid(appid);
+					final Timestamp createTimestamp = object.getTimestamp() == null ?
+							new Timestamp(System.currentTimeMillis()) : new Timestamp(object.getTimestamp());
+					final Timestamp updateTimestamp = object.getUpdated() == null ?
+							createTimestamp : new Timestamp(object.getUpdated());
+					final String objectJson = ParaObjectUtils.getJsonWriterNoIdent().
+							writeValueAsString(ParaObjectUtils.getAnnotatedFields(object, false));
+
+					int positionOffset = 0;
+					if (useMSSqlSyntax) {
+						positionOffset = 2;
+						ps.setTimestamp(1, updateTimestamp);
+						ps.setString(2, objectJson);
+					}
+
+					ps.setString(positionOffset + 1, object.getId());
+					ps.setString(positionOffset + 2, object.getType());
+					ps.setString(positionOffset + 3, object.getCreatorid());
+					ps.setTimestamp(positionOffset + 4, createTimestamp);
+					ps.setTimestamp(positionOffset + 5, updateTimestamp);
+					ps.setString(positionOffset + 6, objectJson);
+					if (useMySqlSyntax || usePGSqlSyntax) {
+						ps.setTimestamp(positionOffset + 7, updateTimestamp);
+						ps.setString(positionOffset + 8, objectJson);
+					}
+					ps.addBatch();
+				}
+				ps.executeBatch();
+			}
 		} catch (Exception e) {
 			logger.error("Failed to create rows for appid '{}' in the SQL database{}", appid, logSqlError(e), e);
 		}
@@ -336,6 +358,9 @@ public final class SqlUtils {
 			return;
 		}
 		try (Connection connection = getConnection()) {
+			if (connection == null) {
+				return;
+			}
 			String tableName = getTableNameForAppid(appid);
 			Map<String, P> objectsMap = new HashMap<>(objects.size());
 			for (P object : objects) {
@@ -347,29 +372,26 @@ public final class SqlUtils {
 
 			Map<String, P> existingObjects = readRows(appid, new ArrayList<>(objectsMap.keySet()));
 
-			PreparedStatement ps = connection.prepareStatement(Utils.formatMessage(
-					"UPDATE {0} SET {1}=?,{2}=? WHERE {3} = ?",
-					tableName,
-					Config._UPDATED,
-					JSON_FIELD_NAME,
-					Config._ID));
+			try (PreparedStatement ps = connection.prepareStatement(Utils.formatMessage(
+					"UPDATE {0} SET {1}=?,{2}=? WHERE {3} = ?", tableName,
+					Config._UPDATED, JSON_FIELD_NAME, Config._ID))) {
+				for (P existingObject : existingObjects.values()) {
+					if (existingObject != null) {
+						P object = objectsMap.get(existingObject.getId());
+						Map<String, Object> data = ParaObjectUtils.getAnnotatedFields(object, false);
+						P updated = ParaObjectUtils.setAnnotatedFields(existingObject, data, Locked.class);
 
-			for (P existingObject : existingObjects.values()) {
-				if (existingObject != null) {
-					P object = objectsMap.get(existingObject.getId());
-					Map<String, Object> data = ParaObjectUtils.getAnnotatedFields(object, false);
-					P updated = ParaObjectUtils.setAnnotatedFields(existingObject, data, Locked.class);
-
-					final Timestamp updateTimestamp = object.getUpdated() == null ?
-							new Timestamp(System.currentTimeMillis()) : new Timestamp(object.getUpdated());
-					ps.setTimestamp(1, updateTimestamp);
-					ps.setString(2, ParaObjectUtils.getJsonWriterNoIdent().
-							writeValueAsString(ParaObjectUtils.getAnnotatedFields(updated, false)));
-					ps.setString(3, updated.getId());
-					ps.addBatch();
+						final Timestamp updateTimestamp = object.getUpdated() == null ?
+								new Timestamp(System.currentTimeMillis()) : new Timestamp(object.getUpdated());
+						ps.setTimestamp(1, updateTimestamp);
+						ps.setString(2, ParaObjectUtils.getJsonWriterNoIdent().
+								writeValueAsString(ParaObjectUtils.getAnnotatedFields(updated, false)));
+						ps.setString(3, updated.getId());
+						ps.addBatch();
+					}
 				}
+				ps.executeBatch();
 			}
-			ps.executeBatch();
 		} catch (Exception e) {
 			logger.error("Failed to update rows for appid '{}' in the SQL database{}", appid, logSqlError(e));
 		}
@@ -386,16 +408,19 @@ public final class SqlUtils {
 			return;
 		}
 		try (Connection connection = getConnection()) {
-			String tableName = getTableNameForAppid(appid);
-			PreparedStatement ps = connection.prepareStatement(Utils.formatMessage(
-					"DELETE FROM {0} WHERE {1} IN ({2})",
-					tableName,
-					Config._ID,
-					StringUtils.repeat("?", ",", objects.size())));
-			for (int i = 0; i < objects.size(); i++) {
-				ps.setString(i + 1, objects.get(i).getId());
+			if (connection == null) {
+				return;
 			}
-			ps.execute();
+			String tableName = getTableNameForAppid(appid);
+			try (PreparedStatement ps = connection.prepareStatement(Utils.formatMessage(
+					"DELETE FROM {0} WHERE {1} IN ({2})", tableName, Config._ID,
+					StringUtils.repeat("?", ",", objects.size())))) {
+
+				for (int i = 0; i < objects.size(); i++) {
+					ps.setString(i + 1, objects.get(i).getId());
+				}
+				ps.execute();
+			}
 		} catch (Exception e) {
 			logger.error("Failed to delete rows for appid '{}' in the SQL database{}", appid, logSqlError(e));
 		}
@@ -416,33 +441,37 @@ public final class SqlUtils {
 			pager = new Pager();
 		}
 		try (Connection connection = getConnection()) {
+			if (connection == null) {
+				return Collections.emptyList();
+			}
 			List<P> results = new ArrayList<>(pager.getLimit());
 			int start = pager.getPage() <= 1 ? 0 : (int) (pager.getPage() - 1) * pager.getLimit();
 			String tableName = getTableNameForAppid(appid);
-			PreparedStatement p = connection.prepareStatement(Utils.formatMessage(
+			try (PreparedStatement p = connection.prepareStatement(Utils.formatMessage(
 					"SELECT ROWNUM(), {0} FROM (SELECT {1} FROM {2}) WHERE ROWNUM() > ? LIMIT ?",
-					JSON_FIELD_NAME,
-					JSON_FIELD_NAME,
-					tableName));
-			p.setInt(1, start);
-			p.setInt(2, pager.getLimit());
-			ResultSet res = p.executeQuery();
-			int i = 0;
-			while (res.next()) {
-				P obj = ParaObjectUtils.fromJSON(res.getString(2));
-				if (obj != null) {
-					results.add(obj);
-					pager.setLastKey(obj.getId());
-					i++;
+					JSON_FIELD_NAME, JSON_FIELD_NAME, tableName))) {
+
+				p.setInt(1, start);
+				p.setInt(2, pager.getLimit());
+				try (ResultSet res = p.executeQuery()) {
+					int i = 0;
+					while (res.next()) {
+						P obj = ParaObjectUtils.fromJSON(res.getString(2));
+						if (obj != null) {
+							results.add(obj);
+							pager.setLastKey(obj.getId());
+							i++;
+						}
+					}
+					pager.setCount(pager.getCount() + i);
+					if (pager.getPage() < 2) {
+						pager.setPage(2);
+					} else {
+						pager.setPage(pager.getPage() + 1);
+					}
+					return results;
 				}
 			}
-			pager.setCount(pager.getCount() + i);
-			if (pager.getPage() < 2) {
-				pager.setPage(2);
-			} else {
-				pager.setPage(pager.getPage() + 1);
-			}
-			return results;
 		} catch (Exception e) {
 			logger.error("Failed to read page for appid '{}' from the SQL database{}", appid, logSqlError(e));
 		}
@@ -469,7 +498,7 @@ public final class SqlUtils {
 					+ "WHEN MATCHED THEN UPDATE SET {1}=?,{2}=? WHEN NOT MATCHED THEN INSERT "
 					+ "VALUES (?,?,?,?,?,?)", tableName, Config._UPDATED, JSON_FIELD_NAME));
 		} else {
-			ps = conn.prepareStatement("MERGE INTO " + tableName + " VALUES (?,?,?,?,?,?)");
+			ps = conn.prepareStatement(Utils.formatMessage("MERGE INTO {0} VALUES (?,?,?,?,?,?)", tableName));
 		}
 		return ps;
 	}
