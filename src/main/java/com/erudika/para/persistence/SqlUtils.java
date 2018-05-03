@@ -147,8 +147,8 @@ public final class SqlUtils {
 			Config._TIMESTAMP,
 			Config._UPDATED,
 			JSON_FIELD_NAME,
-			useMSSqlSyntax ? "NVARCHAR(2048)" :
-					(useMySqlSyntax ? "VARCHAR(2048) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci" : "VARCHAR(2048)")
+			useMSSqlSyntax ? "NVARCHAR(255)" :
+					(useMySqlSyntax ? "VARCHAR(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci" : "VARCHAR(255)")
 		);
 	}
 
