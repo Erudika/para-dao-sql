@@ -46,21 +46,23 @@ public class SqlDAO implements DAO {
 	 * Default constructor.
 	 */
 	public SqlDAO() {
-		// set up automatic table creation and deletion
-		App.addAppCreatedListener(new AppCreatedListener() {
-			public void onAppCreated(App app) {
-				if (app != null) {
-					SqlUtils.createTable(app.getAppIdentifier());
+		if (getClass().getSimpleName().equals(Config.getConfigParam("dao", ""))) {
+			// set up automatic table creation and deletion
+			App.addAppCreatedListener(new AppCreatedListener() {
+				public void onAppCreated(App app) {
+					if (app != null) {
+						SqlUtils.createTable(app.getAppIdentifier());
+					}
 				}
-			}
-		});
-		App.addAppDeletedListener(new AppDeletedListener() {
-			public void onAppDeleted(App app) {
-				if (app != null) {
-					SqlUtils.deleteTable(app.getAppIdentifier());
+			});
+			App.addAppDeletedListener(new AppDeletedListener() {
+				public void onAppDeleted(App app) {
+					if (app != null) {
+						SqlUtils.deleteTable(app.getAppIdentifier());
+					}
 				}
-			}
-		});
+			});
+		}
 	}
 
 	@Override

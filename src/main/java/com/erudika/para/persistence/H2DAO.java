@@ -45,21 +45,23 @@ public class H2DAO implements DAO {
 	 * Default constructor.
 	 */
 	public H2DAO() {
-		// set up automatic table creation and deletion
-		App.addAppCreatedListener(new AppCreatedListener() {
-			public void onAppCreated(App app) {
-				if (app != null) {
-					H2Utils.createTable(app.getAppIdentifier());
+		if (getClass().getSimpleName().equals(Config.getConfigParam("dao", ""))) {
+			// set up automatic table creation and deletion
+			App.addAppCreatedListener(new AppCreatedListener() {
+				public void onAppCreated(App app) {
+					if (app != null) {
+						H2Utils.createTable(app.getAppIdentifier());
+					}
 				}
-			}
-		});
-		App.addAppDeletedListener(new AppDeletedListener() {
-			public void onAppDeleted(App app) {
-				if (app != null) {
-					H2Utils.deleteTable(app.getAppIdentifier());
+			});
+			App.addAppDeletedListener(new AppDeletedListener() {
+				public void onAppDeleted(App app) {
+					if (app != null) {
+						H2Utils.deleteTable(app.getAppIdentifier());
+					}
 				}
-			}
-		});
+			});
+		}
 	}
 
 	@Override
