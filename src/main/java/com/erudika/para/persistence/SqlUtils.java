@@ -138,8 +138,8 @@ public final class SqlUtils {
 			"{0} {6} PRIMARY KEY NOT NULL,"
 			+ "{1} {6} NOT NULL,"
 			+ "{2} {6} DEFAULT NULL,"
-			+ "{3} TIMESTAMP NOT NULL,"
-			+ "{4} TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,"
+			+ "{3} BIGINT DEFAULT NULL,"
+			+ "{4} BIGINT NOT NULL,"
 			+ "{5} TEXT NOT NULL",
 			Config._ID,
 			Config._TYPE,
@@ -197,7 +197,7 @@ public final class SqlUtils {
 			String tableName = getTableNameForAppid(appid);
 			try	(Statement ps = connection.createStatement()) {
 				ps.execute(Utils.formatMessage(
-							"CREATE TABLE IF NOT EXISTS {0} ({1}){2}",
+							"CREATE TABLE {0} ({1}){2}",
 							tableName,
 							getTableSchema(),
 							useMySqlSyntax ? " CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci" : ""));
@@ -225,7 +225,7 @@ public final class SqlUtils {
 			}
 			String tableName = getTableNameForAppid(appid);
 			try	(Statement ps = connection.createStatement()) {
-				ps.execute(Utils.formatMessage("DROP TABLE IF EXISTS {0}", tableName));
+				ps.execute(Utils.formatMessage("DROP TABLE {0}", tableName));
 			}
 			logger.info("Deleted table named '{}' from the SQL database.", tableName);
 		} catch (Exception e) {
