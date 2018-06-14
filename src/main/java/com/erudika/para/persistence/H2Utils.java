@@ -30,11 +30,9 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
-import java.sql.Timestamp;
 import java.sql.Types;
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -128,9 +126,9 @@ public final class H2Utils {
 					"SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = ?")) {
 			p.setString(1, getTableNameForAppid(appid).toUpperCase());
 			try (ResultSet res = p.executeQuery()) {
-				if (res.next()) {
-					String name = res.getString(1);
-					return name != null;
+				if (res.next() && res.getString(1) != null) {
+					addJsonUpdatesColumnIfMissing(appid);
+					return true;
 				}
 			}
 		} catch (Exception e) {
@@ -151,9 +149,8 @@ public final class H2Utils {
 		try (Connection conn = getConnection(); Statement s = conn.createStatement()) {
 			String table = getTableNameForAppid(appid);
 			String sql = Utils.formatMessage("CREATE TABLE IF NOT EXISTS {0} ({1} NVARCHAR PRIMARY KEY,{2} NVARCHAR,"
-					+ "{3} NVARCHAR,{4} NVARCHAR,{5} NVARCHAR,{6} TIMESTAMP,{7} TIMESTAMP,json NVARCHAR)",
-					table, Config._ID, Config._TYPE, Config._NAME, Config._PARENTID, Config._CREATORID,
-					Config._TIMESTAMP, Config._UPDATED);
+					+ "{3} NVARCHAR,{4} NVARCHAR,{5} NVARCHAR,json NVARCHAR,json_updates NVARCHAR)",
+					table, Config._ID, Config._TYPE, Config._NAME, Config._PARENTID, Config._CREATORID);
 			s.execute(sql);
 			logger.info("Created H2 table '{}'.", table);
 			return true;
@@ -180,6 +177,52 @@ public final class H2Utils {
 			logger.error(null, e);
 		}
 		return true;
+	}
+
+	/**
+	 * @param appid id of the {@link com.erudika.para.core.App}
+	 * @return true if table was altered
+	 */
+	private static boolean addJsonUpdatesColumnIfMissing(String appid) {
+		if (StringUtils.isBlank(appid)) {
+			return false;
+		}
+		String table = getTableNameForAppid(appid);
+		try (Connection conn = getConnection(); PreparedStatement p = conn.prepareStatement(
+				"SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS "
+						+ "WHERE COLUMN_NAME = 'JSON_UPDATES' AND TABLE_NAME = ?")) {
+			p.setString(1, table.toUpperCase());
+			try (ResultSet res = p.executeQuery(); Statement addColumnPS = conn.createStatement()) {
+				if (!res.next()) {
+					addColumnPS.execute(Utils.formatMessage("ALTER TABLE {0} ADD json_updates NVARCHAR", table));
+					return true;
+				}
+			}
+		} catch (Exception e) {
+			logger.error(null, e);
+		}
+		return false;
+	}
+
+	/**
+	 * @param appid app id
+	 * @param exceptionMsg exception reason
+	 * @return true if table was altered
+	 */
+	private static boolean addJsonUpdatesColumnIfMissing(String appid, String exceptionMsg) {
+		if (StringUtils.isBlank(appid)) {
+			return false;
+		}
+		if (StringUtils.containsIgnoreCase(exceptionMsg, "json_updates")) {
+			String table = getTableNameForAppid(appid);
+			try (Connection conn = getConnection(); Statement addColumnPS = conn.createStatement()) {
+				addColumnPS.execute(Utils.formatMessage("ALTER TABLE {0} ADD json_updates NVARCHAR", table));
+				return true;
+			} catch (Exception e) {
+				logger.error(null, e);
+			}
+		}
+		return false;
 	}
 
 	/**
@@ -210,7 +253,7 @@ public final class H2Utils {
 		}
 		String table = getTableNameForAppid(appid);
 		try (Connection conn = getConnection(); PreparedStatement ps = conn.prepareStatement(Utils.formatMessage(
-				"SELECT json FROM {0} WHERE {1} IN ({2})", table, Config._ID,
+				"SELECT json, json_updates FROM {0} WHERE {1} IN ({2})", table, Config._ID,
 				StringUtils.repeat("?", ",", ids.size())))) {
 
 			Map<String, P> results = new LinkedHashMap<>();
@@ -222,13 +265,21 @@ public final class H2Utils {
 				while (res.next()) {
 					P obj = ParaObjectUtils.fromJSON(res.getString(1));
 					if (obj != null) {
-						results.put(obj.getId(), obj);
+						if (res.getString(2) != null) {
+							results.put(obj.getId(), ParaObjectUtils.setAnnotatedFields(obj,
+									ParaObjectUtils.getJsonReader(Map.class).readValue(res.getString(2)), null));
+						} else {
+							results.put(obj.getId(), obj);
+						}
 					}
 				}
 				return results;
 			}
 		} catch (Exception e) {
 			logger.error(null, e);
+			if (addJsonUpdatesColumnIfMissing(appid, e.getMessage())) {
+				readRows(appid, ids);
+			}
 		}
 		return Collections.emptyMap();
 	}
@@ -245,7 +296,7 @@ public final class H2Utils {
 		}
 		String table = getTableNameForAppid(appid);
 		try (Connection conn = getConnection(); PreparedStatement ps = conn.prepareStatement(
-				"MERGE INTO " + table + " VALUES (?,?,?,?,?,?,?,?)")) {
+				"MERGE INTO " + table + " VALUES (?,?,?,?,?,?,?)")) {
 
 			for (P object : objects) {
 				if (StringUtils.isBlank(object.getId())) {
@@ -261,14 +312,9 @@ public final class H2Utils {
 				ps.setString(3, object.getName());
 				ps.setString(4, object.getParentid());
 				ps.setString(5, object.getCreatorid());
-				ps.setTimestamp(6, new Timestamp(object.getTimestamp()));
-				if (object.getUpdated() == null) {
-					ps.setNull(7, Types.TIMESTAMP);
-				} else {
-					ps.setTimestamp(7, new Timestamp(object.getUpdated()));
-				}
-				ps.setString(8, ParaObjectUtils.getJsonWriterNoIdent().
+				ps.setString(6, ParaObjectUtils.getJsonWriterNoIdent().
 						writeValueAsString(ParaObjectUtils.getAnnotatedFields(object, false)));
+				ps.setNull(7, Types.NVARCHAR); // JSON updates column is null on create
 				ps.addBatch();
 			}
 			ps.executeBatch();
@@ -288,44 +334,25 @@ public final class H2Utils {
 			return;
 		}
 		String table = getTableNameForAppid(appid);
-		String sql = Utils.formatMessage("UPDATE {0} SET {1}=?,{2}=?,{3}=?,{4}=?,{5}=?,{6}=?,json=? "
-				+ "WHERE {7} = ?", table, Config._TYPE, Config._NAME, Config._PARENTID, Config._CREATORID,
-				Config._TIMESTAMP, Config._UPDATED, Config._ID);
+		String sql = Utils.formatMessage("UPDATE {0} SET json_updates=? "
+				+ "WHERE {2} = ?", table, Config._ID);
 
 		try (Connection conn = getConnection(); PreparedStatement ps = conn.prepareStatement(sql)) {
-			Map<String, P> objectsMap = new HashMap<>(objects.size());
 			for (P object : objects) {
-				if (object != null && !StringUtils.isBlank(object.getId())) {
+				if (object != null) {
 					object.setUpdated(Utils.timestamp());
-					objectsMap.put(object.getId(), object);
-				}
-			}
-			Map<String, P> existingObjects = readRows(appid, new ArrayList<>(objectsMap.keySet()));
-			for (P existingObject : existingObjects.values()) {
-				if (existingObject != null) {
-					P object = objectsMap.get(existingObject.getId());
-					Map<String, Object> data = ParaObjectUtils.getAnnotatedFields(object, false);
-					P updated = ParaObjectUtils.setAnnotatedFields(existingObject, data, Locked.class);
-
-					ps.setString(1, updated.getType());
-					ps.setString(2, updated.getName());
-					ps.setString(3, updated.getParentid());
-					ps.setString(4, updated.getCreatorid());
-					if (updated.getTimestamp() == null) {
-						ps.setNull(5, Types.TIMESTAMP);
-					} else {
-						ps.setTimestamp(5, new Timestamp(updated.getTimestamp()));
-					}
-					ps.setTimestamp(6, new Timestamp(updated.getUpdated()));
-					ps.setString(7, ParaObjectUtils.getJsonWriterNoIdent().
-							writeValueAsString(ParaObjectUtils.getAnnotatedFields(updated, false)));
-					ps.setString(8, updated.getId());
+					Map<String, Object> data = ParaObjectUtils.getAnnotatedFields(object, Locked.class, false);
+					ps.setString(1, ParaObjectUtils.getJsonWriterNoIdent().writeValueAsString(data));
+					ps.setString(2, object.getId());
 					ps.addBatch();
 				}
 			}
 			ps.executeBatch();
 		} catch (Exception e) {
 			logger.error(null, e);
+			if (addJsonUpdatesColumnIfMissing(appid, e.getMessage())) {
+				updateRows(appid, objects);
+			}
 		}
 	}
 
@@ -369,7 +396,8 @@ public final class H2Utils {
 		String table = getTableNameForAppid(appid);
 		int start = pager.getPage() <= 1 ? 0 : (int) (pager.getPage() - 1) * pager.getLimit();
 		try (Connection conn = getConnection(); PreparedStatement p = conn.prepareStatement(
-				"SELECT ROWNUM(), json FROM (SELECT json FROM " + table + ") WHERE ROWNUM() > ? LIMIT ?")) {
+				"SELECT ROWNUM(), json, json_updates FROM (SELECT json, json_updates FROM " + table + ") "
+						+ "WHERE ROWNUM() > ? LIMIT ?")) {
 
 			List<P> results = new ArrayList<>(pager.getLimit());
 			p.setInt(1, start);
@@ -379,7 +407,12 @@ public final class H2Utils {
 				while (res.next()) {
 					P obj = ParaObjectUtils.fromJSON(res.getString(2));
 					if (obj != null) {
-						results.add(obj);
+						if (res.getString(3) != null) {
+							results.add(ParaObjectUtils.setAnnotatedFields(obj,
+									ParaObjectUtils.getJsonReader(Map.class).readValue(res.getString(3)), null));
+						} else {
+							results.add(obj);
+						}
 						pager.setLastKey(obj.getId());
 						i++;
 					}
@@ -394,6 +427,9 @@ public final class H2Utils {
 			}
 		} catch (Exception e) {
 			logger.error(null, e);
+			if (addJsonUpdatesColumnIfMissing(appid, e.getMessage())) {
+				scanRows(appid, pager);
+			}
 		}
 		return Collections.emptyList();
 	}
