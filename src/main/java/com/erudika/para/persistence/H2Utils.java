@@ -195,6 +195,7 @@ public final class H2Utils {
 			try (ResultSet res = p.executeQuery(); Statement addColumnPS = conn.createStatement()) {
 				if (!res.next()) {
 					addColumnPS.execute(Utils.formatMessage("ALTER TABLE {0} ADD json_updates NVARCHAR", table));
+					logger.info("Table '{}' was altered to include 'json_updates' column.", table);
 					return true;
 				}
 			}
@@ -217,6 +218,29 @@ public final class H2Utils {
 			String table = getTableNameForAppid(appid);
 			try (Connection conn = getConnection(); Statement addColumnPS = conn.createStatement()) {
 				addColumnPS.execute(Utils.formatMessage("ALTER TABLE {0} ADD json_updates NVARCHAR", table));
+				logger.info("Table '{}' was altered to include 'json_updates' column.", table);
+				return true;
+			} catch (Exception e) {
+				logger.error(null, e);
+			}
+		}
+		return false;
+	}
+
+	/**
+	 * @param appid app id
+	 * @param exceptionMsg exception reason
+	 * @return true if table was altered
+	 */
+	private static boolean removeTimestampUpdatedColumns(String appid, String exceptionMsg) {
+		if (StringUtils.isBlank(appid)) {
+			return false;
+		}
+		if (StringUtils.containsIgnoreCase(exceptionMsg, "column count")) {
+			String table = getTableNameForAppid(appid);
+			try (Connection conn = getConnection(); Statement removeColumnPS = conn.createStatement()) {
+				removeColumnPS.execute(Utils.formatMessage("ALTER TABLE {0} DROP COLUMN timestamp, updated", table));
+				logger.info("Table {} was altered - 'timestamp', 'updated' columns were removed.", table);
 				return true;
 			} catch (Exception e) {
 				logger.error(null, e);
@@ -276,9 +300,10 @@ public final class H2Utils {
 				return results;
 			}
 		} catch (Exception e) {
-			logger.error(null, e);
 			if (addJsonUpdatesColumnIfMissing(appid, e.getMessage())) {
 				readRows(appid, ids);
+			} else {
+				logger.error(null, e);
 			}
 		}
 		return Collections.emptyMap();
@@ -319,7 +344,11 @@ public final class H2Utils {
 			}
 			ps.executeBatch();
 		} catch (Exception e) {
-			logger.error(null, e);
+			if (removeTimestampUpdatedColumns(appid, e.getMessage())) {
+				createRows(appid, objects);
+			} else {
+				logger.error(null, e);
+			}
 		}
 	}
 
@@ -334,8 +363,7 @@ public final class H2Utils {
 			return;
 		}
 		String table = getTableNameForAppid(appid);
-		String sql = Utils.formatMessage("UPDATE {0} SET json_updates=? "
-				+ "WHERE {2} = ?", table, Config._ID);
+		String sql = Utils.formatMessage("UPDATE {0} SET json_updates=? WHERE {1} = ?", table, Config._ID);
 
 		try (Connection conn = getConnection(); PreparedStatement ps = conn.prepareStatement(sql)) {
 			for (P object : objects) {
@@ -349,9 +377,10 @@ public final class H2Utils {
 			}
 			ps.executeBatch();
 		} catch (Exception e) {
-			logger.error(null, e);
 			if (addJsonUpdatesColumnIfMissing(appid, e.getMessage())) {
 				updateRows(appid, objects);
+			} else {
+				logger.error(null, e);
 			}
 		}
 	}
@@ -426,9 +455,10 @@ public final class H2Utils {
 				return results;
 			}
 		} catch (Exception e) {
-			logger.error(null, e);
 			if (addJsonUpdatesColumnIfMissing(appid, e.getMessage())) {
 				scanRows(appid, pager);
+			} else {
+				logger.error(null, e);
 			}
 		}
 		return Collections.emptyList();
