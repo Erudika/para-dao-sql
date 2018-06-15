@@ -77,7 +77,7 @@
 		<dependency>
 			<groupId>com.zaxxer</groupId>
 			<artifactId>HikariCP</artifactId>
-			<version>3.1.0</version>
+			<version>3.2.0</version>
 		</dependency>
 
 		<!-- H2 DB -->
@@ -85,7 +85,7 @@
 			<groupId>com.h2database</groupId>
 			<artifactId>h2</artifactId>
 			<!--	 1.4.197 breaks tests! -->
-			<version>1.4.196</version>
+			<version>1.4.197</version>
 		</dependency>
 
 		<!-- TESTING -->
