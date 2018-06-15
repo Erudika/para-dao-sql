@@ -90,13 +90,13 @@ This is not required for tables created after v1.30.0.
 Here's the schema for each table created by Para:
 ```sql
 CREATE TABLE {app_identifier} (
-    id						NVARCHAR NOT NULL,
-    type					NVARCHAR,
-    name					NVARCHAR,
-    parentid			NVARCHAR,
-    creatorid			NVARCHAR,
-    json					NVARCHAR,
-    json_updates	NVARCHAR
+    id            NVARCHAR NOT NULL,
+    type          NVARCHAR,
+    name          NVARCHAR,
+    parentid      NVARCHAR,
+    creatorid     NVARCHAR,
+    json          NVARCHAR,
+    json_updates  NVARCHAR
 )
 ```
 
