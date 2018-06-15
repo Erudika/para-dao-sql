@@ -425,20 +425,19 @@ public final class H2Utils {
 		String table = getTableNameForAppid(appid);
 		int start = pager.getPage() <= 1 ? 0 : (int) (pager.getPage() - 1) * pager.getLimit();
 		try (Connection conn = getConnection(); PreparedStatement p = conn.prepareStatement(
-				"SELECT ROWNUM(), json, json_updates FROM (SELECT json, json_updates FROM " + table + ") "
-						+ "WHERE ROWNUM() > ? LIMIT ?")) {
+				Utils.formatMessage("SELECT json, json_updates FROM {0} LIMIT ? OFFSET ?", table))) {
 
 			List<P> results = new ArrayList<>(pager.getLimit());
-			p.setInt(1, start);
-			p.setInt(2, pager.getLimit());
+			p.setInt(1, pager.getLimit());
+			p.setInt(2, start);
 			try (ResultSet res = p.executeQuery()) {
 				int i = 0;
 				while (res.next()) {
-					P obj = ParaObjectUtils.fromJSON(res.getString(2));
+					P obj = ParaObjectUtils.fromJSON(res.getString(1));
 					if (obj != null) {
-						if (res.getString(3) != null) {
+						if (res.getString(2) != null) {
 							results.add(ParaObjectUtils.setAnnotatedFields(obj,
-									ParaObjectUtils.getJsonReader(Map.class).readValue(res.getString(3)), null));
+									ParaObjectUtils.getJsonReader(Map.class).readValue(res.getString(2)), null));
 						} else {
 							results.add(obj);
 						}
