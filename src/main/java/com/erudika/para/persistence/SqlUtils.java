@@ -43,7 +43,6 @@ import java.util.List;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.Map;
-import java.util.HashMap;
 
 /**
  * Helper utilities for performing generic SQL operations using the JDBC library.
@@ -53,6 +52,7 @@ public final class SqlUtils {
 
 	private static final Logger logger = LoggerFactory.getLogger(SqlUtils.class);
 	private static final String JSON_FIELD_NAME = "json";
+	private static final String JSON_UPDATES_FIELD_NAME = "json_updates";
 	private static HikariDataSource hikariDataSource;
 	private static boolean useMySqlSyntax = false;
 	private static boolean useMSSqlSyntax = false;
@@ -135,14 +135,16 @@ public final class SqlUtils {
 
 	private static String getTableSchema() {
 		return Utils.formatMessage(
-			"{0} {4} PRIMARY KEY NOT NULL,"
-			+ "{1} {4} NOT NULL,"
-			+ "{2} {4} DEFAULT NULL,"
-			+ "{3} {5} NOT NULL",
+			"{0} {5} PRIMARY KEY NOT NULL,"
+			+ "{1} {5} NOT NULL,"
+			+ "{2} {5} DEFAULT NULL,"
+			+ "{3} {6} NOT NULL,"
+			+ "{4} {6} DEFAULT NULL",
 			Config._ID,
 			Config._TYPE,
 			Config._CREATORID,
 			JSON_FIELD_NAME,
+			JSON_UPDATES_FIELD_NAME,
 			useMSSqlSyntax ? "NVARCHAR(255)" :
 					(useMySqlSyntax ? "VARCHAR(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci" : "VARCHAR(255)"),
 			useMSSqlSyntax ? "NVARCHAR(MAX)" : "TEXT"
@@ -162,8 +164,8 @@ public final class SqlUtils {
 			if (connection == null) {
 				return false;
 			}
-			try (PreparedStatement ps = connection.prepareStatement("SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES "
-					+ "WHERE TABLE_NAME = ?")) {
+			try (PreparedStatement ps = connection.prepareStatement(
+					"SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = ?")) {
 				ps.setString(1, getTableNameForAppid(appid).toUpperCase());
 				try (ResultSet res = ps.executeQuery()) {
 					if (res.next()) {
@@ -264,8 +266,8 @@ public final class SqlUtils {
 			Map<String, P> results = new LinkedHashMap<>();
 			String tableName = getTableNameForAppid(appid);
 			try	(PreparedStatement ps = connection.prepareStatement(Utils.formatMessage(
-					"SELECT {0} FROM {1} WHERE {2} IN ({3})", JSON_FIELD_NAME, tableName, Config._ID,
-					StringUtils.repeat("?", ",", ids.size())))) {
+					"SELECT {0},{1} FROM {2} WHERE {3} IN ({4})", JSON_FIELD_NAME, JSON_UPDATES_FIELD_NAME,
+					tableName, Config._ID, StringUtils.repeat("?", ",", ids.size())))) {
 
 				for (int i = 0; i < ids.size(); i++) {
 					ps.setString(i + 1, ids.get(i));
@@ -275,7 +277,12 @@ public final class SqlUtils {
 					while (res.next()) {
 						P obj = ParaObjectUtils.fromJSON(res.getString(1));
 						if (obj != null) {
-							results.put(obj.getId(), obj);
+							if (res.getString(2) != null) {
+								results.put(obj.getId(), ParaObjectUtils.setAnnotatedFields(obj,
+										ParaObjectUtils.getJsonReader(Map.class).readValue(res.getString(2)), null));
+							} else {
+								results.put(obj.getId(), obj);
+							}
 						}
 					}
 					return results;
@@ -324,27 +331,19 @@ public final class SqlUtils {
 					ps.setString(4, objectJson);
 
 					if (useMySqlSyntax || usePGSqlSyntax) {
-						ps.setString(5, objectJson);
+						ps.setString(5, object.getType());
+						ps.setString(6, object.getCreatorid());
+						ps.setString(7, objectJson);
 					} else if (useMSSqlSyntax) {
 						ps.setString(5, object.getId());
 						ps.setString(6, object.getId());
 						ps.setString(7, object.getType());
-						if (object.getCreatorid() != null) {
-							ps.setString(8, object.getCreatorid());
-						} else {
-							ps.setNull(8, Types.NULL);
-						}
+						ps.setString(8, object.getCreatorid());
 						ps.setString(9, objectJson);
 					}
 					ps.addBatch();
 				}
-				try {
-					ps.executeBatch();
-				} catch (Exception e) {
-					if (useMSSqlSyntax) {
-
-					}
-				}
+				ps.executeBatch();
 			}
 		} catch (Exception e) {
 			logger.error("Failed to create rows for appid '{}' in the SQL database{}", appid, logSqlError(e), e);
@@ -366,28 +365,16 @@ public final class SqlUtils {
 				return;
 			}
 			String tableName = getTableNameForAppid(appid);
-			Map<String, P> objectsMap = new HashMap<>(objects.size());
-			for (P object : objects) {
-				if (object != null && !StringUtils.isBlank(object.getId())) {
-					object.setUpdated(Utils.timestamp());
-					objectsMap.put(object.getId(), object);
-				}
-			}
+			String sql = Utils.formatMessage("UPDATE {0} SET {1}=? WHERE {2} = ?",
+					tableName, JSON_UPDATES_FIELD_NAME, Config._ID);
 
-			Map<String, P> existingObjects = readRows(appid, new ArrayList<>(objectsMap.keySet()));
-
-			try (PreparedStatement ps = connection.prepareStatement(Utils.formatMessage(
-					"UPDATE {0} SET {1}=? WHERE {2} = ?", tableName, JSON_FIELD_NAME, Config._ID))) {
-				for (P existingObject : existingObjects.values()) {
-					if (existingObject != null) {
-						P object = objectsMap.get(existingObject.getId());
+			try (PreparedStatement ps = connection.prepareStatement(sql)) {
+				for (P object : objects) {
+					if (object != null && !StringUtils.isBlank(object.getId())) {
 						object.setUpdated(Utils.timestamp());
-						Map<String, Object> data = ParaObjectUtils.getAnnotatedFields(object, false);
-						P updated = ParaObjectUtils.setAnnotatedFields(existingObject, data, Locked.class);
-
-						ps.setString(1, ParaObjectUtils.getJsonWriterNoIdent().
-								writeValueAsString(ParaObjectUtils.getAnnotatedFields(updated, false)));
-						ps.setString(2, updated.getId());
+						Map<String, Object> data = ParaObjectUtils.getAnnotatedFields(object, Locked.class, false);
+						ps.setString(1, ParaObjectUtils.getJsonWriterNoIdent().writeValueAsString(data));
+						ps.setString(2, object.getId());
 						ps.addBatch();
 					}
 				}
@@ -456,7 +443,12 @@ public final class SqlUtils {
 					while (res.next()) {
 						P obj = ParaObjectUtils.fromJSON(res.getString(1));
 						if (obj != null) {
-							results.add(obj);
+							if (res.getString(2) != null) {
+								results.add(ParaObjectUtils.setAnnotatedFields(obj,
+										ParaObjectUtils.getJsonReader(Map.class).readValue(res.getString(2)), null));
+							} else {
+								results.add(obj);
+							}
 							pager.setLastKey(obj.getId());
 							i++;
 						}
@@ -476,43 +468,44 @@ public final class SqlUtils {
 		return Collections.emptyList();
 	}
 
-	private static PreparedStatement getReadPagePreparedStatement(Connection conn, String tableName) throws SQLException {
-		PreparedStatement ps;
-		if (useMSSqlSyntax) {
-			ps = conn.prepareStatement(Utils.formatMessage("SELECT TOP (?) * FROM (SELECT {0}, ROW_NUMBER() OVER "
-					+ "(ORDER BY ID ASC) AS RN FROM {1}) AS X WHERE RN > ?", JSON_FIELD_NAME, tableName));
-		} else {
-			ps = conn.prepareStatement(Utils.formatMessage("SELECT {0} FROM {1} LIMIT ? OFFSET ?",
-					JSON_FIELD_NAME, tableName));
-		}
-		return ps;
-	}
-
 	private static PreparedStatement getUpsertRowPreparedStatement(Connection conn, String tableName) throws SQLException {
 		PreparedStatement ps;
 		if (useMySqlSyntax) {
 			ps = conn.prepareStatement(Utils.formatMessage(
-					"INSERT INTO {0} VALUES (?,?,?,?) ON DUPLICATE KEY UPDATE {1}=?", tableName, JSON_FIELD_NAME));
+					"INSERT INTO {0} VALUES (?,?,?,?,NULL) ON DUPLICATE KEY UPDATE {1}=?,{2}=?,{3}=?,{4}=NULL",
+					tableName, Config._TYPE, Config._CREATORID, JSON_FIELD_NAME, JSON_UPDATES_FIELD_NAME));
 		} else if (usePGSqlSyntax) {
 			ps = conn.prepareStatement(Utils.formatMessage(
-					"INSERT INTO {0} VALUES (?,?,?,?) ON CONFLICT ({1}) DO UPDATE SET {2}=?",
-					tableName,
-					Config._ID,
-					JSON_FIELD_NAME));
+					"INSERT INTO {0} VALUES (?,?,?,?,NULL) ON CONFLICT ({1}) DO UPDATE SET {2}=?,{3}=?,{4}=?,{5}=NULL",
+					tableName, Config._ID, Config._TYPE, Config._CREATORID, JSON_FIELD_NAME, JSON_UPDATES_FIELD_NAME));
 		} else if (useMSSqlSyntax) {
 			// UPSERT snippet taken from https://samsaffron.com/blog/archive/2007/04/04/14.aspx
 			ps = conn.prepareStatement(Utils.formatMessage("begin tran\n"
 					+ "if exists (select * from {0} with (updlock,serializable) where {1} = ?)\n"
 					+ "begin\n"
-					+ "   update {0} set {2}=?,{3}=?,{4}=? where {1} = ?\n"
+					+ "   update {0} set {2}=?,{3}=?,{4}=?,{5}=NULL where {1} = ?\n"
 					+ "end\n"
 					+ "else\n"
 					+ "begin\n"
-					+ "   insert {0} ({1},{2},{3},{4}) values (?,?,?,?)\n"
+					+ "   insert {0} ({1},{2},{3},{4},{5}) values (?,?,?,?,NULL)\n"
 					+ "end\n"
-					+ "commit tran", tableName, Config._ID, Config._TYPE, Config._CREATORID, JSON_FIELD_NAME));
+					+ "commit tran", tableName, Config._ID, Config._TYPE, Config._CREATORID,
+					JSON_FIELD_NAME, JSON_UPDATES_FIELD_NAME));
 		} else {
-			ps = conn.prepareStatement(Utils.formatMessage("MERGE INTO {0} VALUES (?,?,?,?)", tableName));
+			ps = conn.prepareStatement(Utils.formatMessage("MERGE INTO {0} VALUES (?,?,?,?,NULL)", tableName));
+		}
+		return ps;
+	}
+
+	private static PreparedStatement getReadPagePreparedStatement(Connection conn, String tableName) throws SQLException {
+		PreparedStatement ps;
+		if (useMSSqlSyntax) {
+			ps = conn.prepareStatement(Utils.formatMessage("SELECT TOP (?) * FROM (SELECT {0},{1},ROW_NUMBER() OVER "
+					+ "(ORDER BY ID ASC) AS RN FROM {2}) AS X WHERE RN > ?",
+					JSON_FIELD_NAME, JSON_UPDATES_FIELD_NAME, tableName));
+		} else {
+			ps = conn.prepareStatement(Utils.formatMessage("SELECT {0},{1} FROM {2} LIMIT ? OFFSET ?",
+					JSON_FIELD_NAME, JSON_UPDATES_FIELD_NAME, tableName));
 		}
 		return ps;
 	}
