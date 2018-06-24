@@ -62,7 +62,7 @@ public final class H2Utils {
 	static Connection getConnection() throws SQLException {
 		String host = Config.getConfigParam("db.hostname", "");
 		String serverPrefix = StringUtils.isBlank(host) ? "" : "tcp://" + host + "/";
-		String dir = Config.getConfigParam("db.dir", "data");
+		String dir = Config.getConfigParam("db.dir", serverPrefix.isEmpty() ? "./data" : "data");
 		String url = "jdbc:h2:" + serverPrefix + dir + File.separator + Config.getRootAppIdentifier();
 		String user = Config.getConfigParam("db.user", Config.getRootAppIdentifier());
 		String pass = Config.getConfigParam("db.password", "secret");
