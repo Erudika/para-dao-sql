@@ -350,6 +350,7 @@ public final class H2Utils {
 				createRows(appid, objects);
 			} else {
 				logger.error(null, e);
+				throwIfNecessary(e);
 			}
 		}
 	}
@@ -383,6 +384,7 @@ public final class H2Utils {
 				updateRows(appid, objects);
 			} else {
 				logger.error(null, e);
+				throwIfNecessary(e);
 			}
 		}
 	}
@@ -407,6 +409,7 @@ public final class H2Utils {
 			ps.execute();
 		} catch (Exception e) {
 			logger.error(null, e);
+			throwIfNecessary(e);
 		}
 	}
 
@@ -463,5 +466,11 @@ public final class H2Utils {
 			}
 		}
 		return Collections.emptyList();
+	}
+
+	private static void throwIfNecessary(Throwable t) {
+		if (t != null && Config.getConfigBoolean("fail_on_write_errors", false)) {
+			throw new RuntimeException("DAO write operation failed!", t);
+		}
 	}
 }
