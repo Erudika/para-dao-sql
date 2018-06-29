@@ -347,6 +347,7 @@ public final class SqlUtils {
 			}
 		} catch (Exception e) {
 			logger.error("Failed to create rows for appid '{}' in the SQL database{}", appid, logSqlError(e), e);
+			throwIfNecessary(e);
 		}
 	}
 
@@ -382,6 +383,7 @@ public final class SqlUtils {
 			}
 		} catch (Exception e) {
 			logger.error("Failed to update rows for appid '{}' in the SQL database{}", appid, logSqlError(e));
+			throwIfNecessary(e);
 		}
 	}
 
@@ -411,6 +413,7 @@ public final class SqlUtils {
 			}
 		} catch (Exception e) {
 			logger.error("Failed to delete rows for appid '{}' in the SQL database{}", appid, logSqlError(e));
+			throwIfNecessary(e);
 		}
 	}
 
@@ -508,6 +511,12 @@ public final class SqlUtils {
 					JSON_FIELD_NAME, JSON_UPDATES_FIELD_NAME, tableName));
 		}
 		return ps;
+	}
+
+	private static void throwIfNecessary(Throwable t) {
+		if (t != null && Config.getConfigBoolean("fail_on_write_errors", false)) {
+			throw new RuntimeException("DAO write operation failed!", t);
+		}
 	}
 
 	private static String logSqlError(Exception e) {
