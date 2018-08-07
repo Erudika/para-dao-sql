@@ -61,15 +61,15 @@ public final class H2Utils {
 	 */
 	static Connection getConnection() throws SQLException {
 		String host = Config.getConfigParam("db.hostname", "");
-		String serverPrefix = StringUtils.isBlank(host) ? "" : "tcp://" + host + "/";
-		String dir = Config.getConfigParam("db.dir", serverPrefix.isEmpty() ? "./data" : "data");
-		String url = "jdbc:h2:" + serverPrefix + dir + File.separator + Config.getRootAppIdentifier();
+		String tcpPrefix = StringUtils.isBlank(host) ? "" : "tcp://" + host + "/";
+		String dir = Config.getConfigParam("db.dir", "./data");
+		String url = "jdbc:h2:" + tcpPrefix + dir + File.separator + Config.getRootAppIdentifier();
 		String user = Config.getConfigParam("db.user", Config.getRootAppIdentifier());
 		String pass = Config.getConfigParam("db.password", "secret");
 		try {
 			if (server == null) {
 				org.h2.Driver.load();
-				String serverParams = Config.getConfigParam("db.tcpServer", "-baseDir " + dir);
+				String serverParams = Config.getConfigParam("db.tcpServer", tcpPrefix.isEmpty() ? "-baseDir " + dir : "");
 				String[] params = StringUtils.split(serverParams, ' ');
 				server = Server.createTcpServer(params);
 				server.start();
