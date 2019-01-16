@@ -17,7 +17,6 @@
  */
 package com.erudika.para.persistence;
 
-import com.erudika.para.persistence.DAOTest;
 import com.erudika.para.utils.Config;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
