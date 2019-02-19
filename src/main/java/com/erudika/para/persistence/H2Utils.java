@@ -17,6 +17,8 @@
  */
 package com.erudika.para.persistence;
 
+import com.erudika.para.DestroyListener;
+import com.erudika.para.Para;
 import com.erudika.para.annotations.Locked;
 import com.erudika.para.core.App;
 import com.erudika.para.core.ParaObject;
@@ -78,8 +80,8 @@ public final class H2Utils {
 					createTable(Config.getRootAppIdentifier());
 				}
 
-				Runtime.getRuntime().addShutdownHook(new Thread() {
-					public void run() {
+				Para.addDestroyListener(new DestroyListener() {
+					public void onDestroy() {
 						shutdownClient();
 					}
 				});
