@@ -32,7 +32,9 @@ The plugin is on Maven Central. Here's the Maven snippet to include in your `pom
 ```
 
 Alternatively you can download the JAR from the "Releases" tab above put it in a `lib` folder alongside the server
-WAR file `para-x.y.z.war`. Para will look for plugins inside `lib` and pick up the plugin.
+WAR file `para-x.y.z.war`. Para will look for plugins inside `lib` and pick up the plugin but the plugin itself will
+try to load the correct driver and needs to know where to look for it. That's why you have to set the system property
+`loader.path=./lib`.
 
 ### Configuration
 
@@ -72,9 +74,9 @@ fully-qualified class name for your SQL driver. Upon initialization, the SQL DAO
 and verify that it exists in the classpath. If the driver cannot be found, the SQL DAO will fail to initiailize and
 the DAO cannot be used.
 
-In addition to specifying the driver name, you need to ensure the jarfile containing the SQL driver corresponding to
+In addition to specifying the driver name, you need to ensure the JAR file containing the SQL driver corresponding to
 your database is on your classpath when launching Para Server. The easiest way to do this is to add your SQL driver's
-jarfile to the `lib/` directory relative to the location of the Para Server WAR file `para-x.y.z.war`.
+JAR file to the `lib/` directory relative to the location of the Para Server WAR file `para-x.y.z.war`.
 
 ### Schema
 
