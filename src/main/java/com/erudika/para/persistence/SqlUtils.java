@@ -86,7 +86,7 @@ public final class SqlUtils {
 		// verify the SQL driver can be loaded from the classpath
 		try {
 			Class.forName(sqlDriver);
-			useMySqlSyntax = sqlDriver.contains("mysql");
+			useMySqlSyntax = StringUtils.containsAny(sqlDriver, "mysql", "mariadb");
 			useMSSqlSyntax = sqlDriver.contains("sqlserver");
 			usePGSqlSyntax = sqlDriver.contains("postgresql");
 		} catch (ClassNotFoundException e) {
