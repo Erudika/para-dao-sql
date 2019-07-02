@@ -206,6 +206,36 @@ public final class SqlUtils {
 			logger.info("Created SQL database table named '{}'.", tableName);
 			return true;
 		} catch (Exception e) {
+			if (useMySqlSyntax) {
+				createTableForLegacyMySQL(appid);
+			} else {
+				logger.error("Failed to create a new table for appid '{}' in the SQL database{}", appid, logSqlError(e));
+			}
+		}
+		return false;
+	}
+
+	/**
+	 * Legacy MySQL <= 5.6 has a key limit of 767 bytes.
+	 * https://stackoverflow.com/questions/1814532/1071-specified-key-was-too-long-max-key-length-is-767-bytes
+	 * https://github.com/Erudika/para/issues/41
+	 * @param appid app id
+	 * @return true if created
+	 */
+	private static boolean createTableForLegacyMySQL(String appid) {
+		try (Connection connection = getConnection()) {
+			if (connection == null) {
+				return false;
+			}
+			String tableSchema = getTableSchema().replace("VARCHAR(255)", "VARCHAR(190)");
+			String tableName = getTableNameForAppid(appid);
+			try (Statement ps = connection.createStatement()) {
+				ps.execute(Utils.formatMessage("CREATE TABLE {0} ({1}){2}", tableName, tableSchema,
+						" CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci"));
+			}
+			logger.info("Created SQL database table named '{}'.", tableName);
+			return true;
+		} catch (Exception e) {
 			logger.error("Failed to create a new table for appid '{}' in the SQL database{}", appid, logSqlError(e));
 		}
 		return false;
