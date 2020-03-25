@@ -167,13 +167,11 @@ public final class SqlUtils {
 				return false;
 			}
 			try (PreparedStatement ps = connection.prepareStatement(
-					"SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = ?")) {
-				ps.setString(1, getTableNameForAppid(appid).toUpperCase());
+					"SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = ? OR TABLE_NAME = ?")) {
+				ps.setString(1, getTableNameForAppid(appid));
+				ps.setString(2, getTableNameForAppid(appid).toUpperCase());
 				try (ResultSet res = ps.executeQuery()) {
-					if (res.next()) {
-						String name = res.getString(1);
-						return name != null;
-					}
+					return res.next() && res.getString(1) != null;
 				}
 			}
 		} catch (Exception e) {
