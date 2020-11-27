@@ -18,8 +18,6 @@
 
 package com.erudika.para.persistence;
 
-import com.erudika.para.AppCreatedListener;
-import com.erudika.para.AppDeletedListener;
 import com.erudika.para.core.App;
 import com.erudika.para.core.ParaObject;
 import com.erudika.para.utils.Config;
@@ -42,27 +40,26 @@ public class SqlDAO implements DAO {
 
 	private static final Logger logger = LoggerFactory.getLogger(SqlDAO.class);
 
+	static {
+		if (SqlDAO.class.getSimpleName().equals(Config.getConfigParam("dao", ""))) {
+			// set up automatic table creation and deletion
+			App.addAppCreatedListener((App app) -> {
+				if (app != null) {
+					SqlUtils.createTable(app.getAppIdentifier());
+				}
+			});
+			App.addAppDeletedListener((App app) -> {
+				if (app != null) {
+					SqlUtils.deleteTable(app.getAppIdentifier());
+				}
+			});
+		}
+	}
+
 	/**
 	 * Default constructor.
 	 */
 	public SqlDAO() {
-		if (getClass().getSimpleName().equals(Config.getConfigParam("dao", ""))) {
-			// set up automatic table creation and deletion
-			App.addAppCreatedListener(new AppCreatedListener() {
-				public void onAppCreated(App app) {
-					if (app != null) {
-						SqlUtils.createTable(app.getAppIdentifier());
-					}
-				}
-			});
-			App.addAppDeletedListener(new AppDeletedListener() {
-				public void onAppDeleted(App app) {
-					if (app != null) {
-						SqlUtils.deleteTable(app.getAppIdentifier());
-					}
-				}
-			});
-		}
 	}
 
 	@Override
