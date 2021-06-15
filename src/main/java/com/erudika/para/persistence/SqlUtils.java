@@ -506,7 +506,7 @@ public final class SqlUtils {
 	}
 
 	private static PreparedStatement getInfoTablePreparedStatement(Connection connection) throws SQLException {
-		 if (useLiSqlSyntax) {
+		if (useLiSqlSyntax) {
 			return connection.prepareStatement("SELECT tbl_name FROM sqlite_master WHERE tbl_name = ? OR tbl_name = ?");
 		}
 		return connection.prepareStatement(Utils.formatMessage("SELECT TABLE_NAME FROM {0} WHERE "
