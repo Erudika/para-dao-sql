@@ -59,6 +59,7 @@ public final class SqlUtils {
 	private static boolean useMySqlSyntax = false;
 	private static boolean useMSSqlSyntax = false;
 	private static boolean usePGSqlSyntax = false;
+	private static boolean useOrSqlSyntax = false;
 
 	private SqlUtils() { }
 
@@ -89,6 +90,7 @@ public final class SqlUtils {
 			useMySqlSyntax = StringUtils.containsAny(sqlDriver, "mysql", "mariadb");
 			useMSSqlSyntax = sqlDriver.contains("sqlserver");
 			usePGSqlSyntax = sqlDriver.contains("postgresql");
+			useOrSqlSyntax = sqlDriver.contains("oracle");
 		} catch (ClassNotFoundException e) {
 			logger.error("Error loading SQL driver \"" + sqlDriver + "\", class not found.");
 			return null;
@@ -137,19 +139,20 @@ public final class SqlUtils {
 
 	private static String getTableSchema() {
 		return Utils.formatMessage(
-			"{0} {5} PRIMARY KEY NOT NULL,"
-			+ "{1} {5} NOT NULL,"
-			+ "{2} {5} DEFAULT NULL,"
-			+ "{3} {6} NOT NULL,"
-			+ "{4} {6} DEFAULT NULL",
+			"{0} {5} PRIMARY KEY NOT NULL," +
+			"{1} {5} NOT NULL," +
+			"{2} {5} DEFAULT NULL," +
+			"{3} {6} NOT NULL," +
+			"{4} {6} DEFAULT NULL",
 			Config._ID,
 			Config._TYPE,
 			Config._CREATORID,
 			JSON_FIELD_NAME,
 			JSON_UPDATES_FIELD_NAME,
 			useMSSqlSyntax ? "NVARCHAR(255)" :
-					(useMySqlSyntax ? "VARCHAR(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci" : "VARCHAR(255)"),
-			useMSSqlSyntax ? "NVARCHAR(MAX)" : "TEXT"
+					(useMySqlSyntax ? "VARCHAR(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci" :
+							(useOrSqlSyntax ? "NVARCHAR2(255)" : "VARCHAR(255)")),
+			useMSSqlSyntax ? "NVARCHAR(MAX)" : (useOrSqlSyntax ? "NCLOB" : "TEXT")
 		);
 	}
 
@@ -166,8 +169,9 @@ public final class SqlUtils {
 			if (connection == null) {
 				return false;
 			}
-			try (PreparedStatement ps = connection.prepareStatement(
-					"SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = ? OR TABLE_NAME = ?")) {
+			try (PreparedStatement ps = connection.prepareStatement(Utils.formatMessage(
+					"SELECT TABLE_NAME FROM {0} WHERE TABLE_NAME = ? OR TABLE_NAME = ?",
+							useOrSqlSyntax ? "all_tables" : "INFORMATION_SCHEMA.TABLES"))) {
 				ps.setString(1, getTableNameForAppid(appid));
 				ps.setString(2, getTableNameForAppid(appid).toUpperCase());
 				try (ResultSet res = ps.executeQuery()) {
@@ -469,8 +473,8 @@ public final class SqlUtils {
 			int start = pager.getPage() <= 1 ? 0 : (int) (pager.getPage() - 1) * pager.getLimit();
 			String tableName = getTableNameForAppid(appid);
 			try (PreparedStatement p = getReadPagePreparedStatement(connection, tableName)) {
-				p.setInt(1, pager.getLimit());
-				p.setInt(2, start);
+				p.setInt(useOrSqlSyntax ? 2 : 1, pager.getLimit());
+				p.setInt(useOrSqlSyntax ? 1 : 2, start);
 				try (ResultSet res = p.executeQuery()) {
 					int i = 0;
 					while (res.next()) {
@@ -524,6 +528,14 @@ public final class SqlUtils {
 					+ "end\n"
 					+ "commit tran", tableName, Config._ID, Config._TYPE, Config._CREATORID,
 					JSON_FIELD_NAME, JSON_UPDATES_FIELD_NAME));
+		} else if (useOrSqlSyntax) {
+			// https://stackoverflow.com/questions/4015199/oracle-sql-update-if-exists-else-insert
+			ps = conn.prepareStatement(Utils.formatMessage("MERGE INTO {0} d USING "
+					+ "(SELECT ? {1}, ? {2}, ? {3}, ? {4}, NULL {5} FROM dual) s "
+					+ "ON (d.{1} = s.{1}) WHEN MATCHED THEN "
+					+ "UPDATE SET d.{2} = s.{2}, d.{3} = s.{3}, d.{4} = s.{4}, d.{5} = s.{5} WHEN NOT MATCHED THEN "
+					+ "INSERT (d.{1}, d.{2}, d.{3}, d.{4}, d.{5}) VALUES (s.{1}, s.{2}, s.{3}, s.{4}, s.{5})",
+					tableName, Config._ID, Config._TYPE, Config._CREATORID, JSON_FIELD_NAME, JSON_UPDATES_FIELD_NAME));
 		} else {
 			ps = conn.prepareStatement(Utils.formatMessage("MERGE INTO {0} VALUES (?,?,?,?,NULL)", tableName));
 		}
@@ -535,6 +547,9 @@ public final class SqlUtils {
 		if (useMSSqlSyntax) {
 			ps = conn.prepareStatement(Utils.formatMessage("SELECT TOP (?) * FROM (SELECT {0},{1},ROW_NUMBER() OVER "
 					+ "(ORDER BY ID ASC) AS RN FROM {2}) AS X WHERE RN > ?",
+					JSON_FIELD_NAME, JSON_UPDATES_FIELD_NAME, tableName));
+		} else if (useOrSqlSyntax) {
+			ps = conn.prepareStatement(Utils.formatMessage("SELECT {0},{1} FROM {2} OFFSET ? ROWS FETCH NEXT ? ROWS ONLY",
 					JSON_FIELD_NAME, JSON_UPDATES_FIELD_NAME, tableName));
 		} else {
 			ps = conn.prepareStatement(Utils.formatMessage("SELECT {0},{1} FROM {2} LIMIT ? OFFSET ?",

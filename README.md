@@ -36,6 +36,17 @@ WAR file `para-x.y.z.war`. Para will look for plugins inside `lib` and pick up t
 try to load the correct driver and needs to know where to look for it. That's why you have to set the system property
 `loader.path=./lib`.
 
+### Supported database engines
+
+- SQL Server
+- PostgreSQL
+- MySQL
+- MariaDB
+- Redshift
+- H2 DB
+- Oracle
+- SQLite
+
 ### Configuration
 
 Here are all the configuration properties for this plugin (these go inside your `application.conf`):
@@ -53,6 +64,7 @@ This could be a Java system property or part of a `application.conf` file on the
 This tells Para to use the SqlDAO Data Access Object (DAO) implementation instead of the default.
 
 #### Setting the SQL URL
+
 The environment variable `para.sql.url` is required and provides the URL to connect to the SQL database.
 The SQL DAO uses JDBC and will prefix your URL with the JDBC protocol, so you don't need to include the JDBC
 protocol in your URL path. For example, to connect to a MySQL server with URL `mysql://localhost:3306`,
@@ -68,6 +80,7 @@ complete permissions within that database.
 
 
 #### Configuring a SQL Driver
+
 The SQL DAO uses JDBC to connect to your SQL database, which means a SQL driver (java.sql.Driver) will be needed for
 your chosen flavor of SQL (for example, `com.mysql.jdbc.Driver` is used for MySQL).  You must specify the
 fully-qualified class name for your SQL driver. Upon initialization, the SQL DAO will attempt to load this driver
@@ -77,6 +90,29 @@ the DAO cannot be used.
 In addition to specifying the driver name, you need to ensure the JAR file containing the SQL driver corresponding to
 your database is on your classpath when launching Para Server. The easiest way to do this is to add your SQL driver's
 JAR file to the `lib/` directory relative to the location of the Para Server WAR file `para-x.y.z.war`.
+
+### Working with Oracle database
+
+To use Oracle you need to create a user (schema) for Para, with `CREATE SESSION` and `CREATE TABLE` privileges.
+You also need to enable writes on the USERS tablespace if you get an error like
+`ora-01950: no privileges on tablespace 'users'`.
+
+```sql
+CREATE USER para IDENTIFIED BY <password>;
+GRANT CREATE SESSION, CREATE TABLE TO para;
+ALTER USER para quota unlimited on USERS;
+```
+
+Then the configuration will look something like this:
+```ini
+para.sql.driver = "oracle.jdbc.OracleDriver"
+para.sql.url = "oracle:thin:@127.0.0.1:1521/XE"
+para.sql.user = "para"
+para.sql.password = "secret"
+```
+
+If you are have a `sysdba/sysoper` type of user, you can set `para.sql.user = "para as sysdba"`.
+The plugin has been tested with the Express edition of Oracle 18c database.
 
 ### Schema
 
