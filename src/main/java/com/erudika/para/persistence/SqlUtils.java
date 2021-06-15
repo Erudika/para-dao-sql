@@ -60,6 +60,7 @@ public final class SqlUtils {
 	private static boolean useMSSqlSyntax = false;
 	private static boolean usePGSqlSyntax = false;
 	private static boolean useOrSqlSyntax = false;
+	private static boolean useLiSqlSyntax = false;
 
 	private SqlUtils() { }
 
@@ -91,6 +92,7 @@ public final class SqlUtils {
 			useMSSqlSyntax = sqlDriver.contains("sqlserver");
 			usePGSqlSyntax = sqlDriver.contains("postgresql");
 			useOrSqlSyntax = sqlDriver.contains("oracle");
+			useLiSqlSyntax = sqlDriver.contains("sqlite");
 		} catch (ClassNotFoundException e) {
 			logger.error("Error loading SQL driver \"" + sqlDriver + "\", class not found.");
 			return null;
@@ -169,9 +171,7 @@ public final class SqlUtils {
 			if (connection == null) {
 				return false;
 			}
-			try (PreparedStatement ps = connection.prepareStatement(Utils.formatMessage(
-					"SELECT TABLE_NAME FROM {0} WHERE TABLE_NAME = ? OR TABLE_NAME = ?",
-							useOrSqlSyntax ? "all_tables" : "INFORMATION_SCHEMA.TABLES"))) {
+			try (PreparedStatement ps = getInfoTablePreparedStatement(connection)) {
 				ps.setString(1, getTableNameForAppid(appid));
 				ps.setString(2, getTableNameForAppid(appid).toUpperCase());
 				try (ResultSet res = ps.executeQuery()) {
@@ -364,7 +364,7 @@ public final class SqlUtils {
 					}
 					ps.setString(4, objectJson);
 
-					if (useMySqlSyntax || usePGSqlSyntax) {
+					if (useMySqlSyntax || usePGSqlSyntax || useLiSqlSyntax) {
 						ps.setString(5, object.getType());
 						ps.setString(6, object.getCreatorid());
 						ps.setString(7, objectJson);
@@ -505,13 +505,21 @@ public final class SqlUtils {
 		return Collections.emptyList();
 	}
 
+	private static PreparedStatement getInfoTablePreparedStatement(Connection connection) throws SQLException {
+		 if (useLiSqlSyntax) {
+			return connection.prepareStatement("SELECT tbl_name FROM sqlite_master WHERE tbl_name = ? OR tbl_name = ?");
+		}
+		return connection.prepareStatement(Utils.formatMessage("SELECT TABLE_NAME FROM {0} WHERE "
+				+ "TABLE_NAME = ? OR TABLE_NAME = ?", useOrSqlSyntax ? "all_tables" : "INFORMATION_SCHEMA.TABLES"));
+	}
+
 	private static PreparedStatement getUpsertRowPreparedStatement(Connection conn, String tableName) throws SQLException {
 		PreparedStatement ps;
 		if (useMySqlSyntax) {
 			ps = conn.prepareStatement(Utils.formatMessage(
 					"INSERT INTO {0} VALUES (?,?,?,?,NULL) ON DUPLICATE KEY UPDATE {1}=?,{2}=?,{3}=?,{4}=NULL",
 					tableName, Config._TYPE, Config._CREATORID, JSON_FIELD_NAME, JSON_UPDATES_FIELD_NAME));
-		} else if (usePGSqlSyntax) {
+		} else if (usePGSqlSyntax || useLiSqlSyntax) {
 			ps = conn.prepareStatement(Utils.formatMessage(
 					"INSERT INTO {0} VALUES (?,?,?,?,NULL) ON CONFLICT ({1}) DO UPDATE SET {2}=?,{3}=?,{4}=?,{5}=NULL",
 					tableName, Config._ID, Config._TYPE, Config._CREATORID, JSON_FIELD_NAME, JSON_UPDATES_FIELD_NAME));

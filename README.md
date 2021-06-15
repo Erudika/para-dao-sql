@@ -56,14 +56,18 @@ para.sql.url = "mysql://localhost:3306"
 para.sql.user = "user"
 para.sql.password = "secret"
 ```
-Finally, set the DAO config property:
+Finally, set the DAO config property - for H2 DB this must be equal to `H2DAO`, for the other databases it should be:
 ```ini
 para.dao = "SqlDAO"
 ```
 This could be a Java system property or part of a `application.conf` file on the classpath.
 This tells Para to use the SqlDAO Data Access Object (DAO) implementation instead of the default.
 
-#### Setting the SQL URL
+SQLite, for example, has the simplest configuration:
+```ini
+para.sql.driver = "org.sqlite.JDBC"
+para.sql.url = "sqlite:/home/user/para.db"
+```
 
 The environment variable `para.sql.url` is required and provides the URL to connect to the SQL database.
 The SQL DAO uses JDBC and will prefix your URL with the JDBC protocol, so you don't need to include the JDBC
@@ -79,7 +83,7 @@ so you must use an existing database. For example, you cannot simply specify the
 complete permissions within that database.
 
 
-#### Configuring a SQL Driver
+### Using a JDBC Driver
 
 The SQL DAO uses JDBC to connect to your SQL database, which means a SQL driver (java.sql.Driver) will be needed for
 your chosen flavor of SQL (for example, `com.mysql.jdbc.Driver` is used for MySQL).  You must specify the
@@ -93,7 +97,7 @@ JAR file to the `lib/` directory relative to the location of the Para Server WAR
 
 ### Working with Oracle database
 
-To use Oracle you need to create a user (schema) for Para, with `CREATE SESSION` and `CREATE TABLE` privileges.
+To use Oracle DB you need to create a user (schema) for Para, with `CREATE SESSION` and `CREATE TABLE` privileges.
 You also need to enable writes on the USERS tablespace if you get an error like
 `ora-01950: no privileges on tablespace 'users'`.
 
