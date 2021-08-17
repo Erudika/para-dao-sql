@@ -19,3 +19,5 @@ echo "" >> changelog.txt && \
 echo "### :package: [Download JAR](https://oss.sonatype.org/service/local/repositories/releases/content/com/erudika/para-dao-sql/${ver}/para-dao-sql-${ver}-shaded.jar)" >> changelog.txt && \
 hub release create -F changelog.txt $ver && \
 rm changelog.txt
+
+docker build -t erudikaltd/para-dao-sql:${ver} . && docker push erudikaltd/para-dao-sql:${ver}
