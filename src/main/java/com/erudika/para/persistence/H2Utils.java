@@ -114,6 +114,7 @@ public final class H2Utils {
 			server.stop();
 			server = null;
 		}
+		org.h2.Driver.unload();
 	}
 
 
