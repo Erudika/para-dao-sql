@@ -34,7 +34,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.sql.Connection;
-import java.sql.Driver;
 import java.sql.DriverManager;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
@@ -44,7 +43,6 @@ import java.sql.Types;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Collections;
-import java.util.Enumeration;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
@@ -138,15 +136,6 @@ public final class SqlUtils {
 		if (hikariDataSource != null) {
 			hikariDataSource.close();
 			hikariDataSource = null;
-		}
-		Enumeration<Driver> drivers = DriverManager.getDrivers();
-		while (drivers.hasMoreElements()) {
-			Driver driver = drivers.nextElement();
-			try {
-				DriverManager.deregisterDriver(driver);
-			} catch (SQLException e) {
-				logger.error(null, e);
-			}
 		}
 	}
 
