@@ -61,6 +61,7 @@ public final class SqlUtils {
 	private static boolean usePGSqlSyntax = false;
 	private static boolean useOrSqlSyntax = false;
 	private static boolean useLiSqlSyntax = false;
+	private static String sqlUrl;
 
 	private SqlUtils() { }
 
@@ -73,7 +74,7 @@ public final class SqlUtils {
 			return hikariDataSource.getConnection();
 		}
 
-		String sqlUrl = Config.getConfigParam("sql.url", null);
+		sqlUrl = Config.getConfigParam("sql.url", null);
 		String sqlDriver = Config.getConfigParam("sql.driver", null);
 		String sqlUser = Config.getConfigParam("sql.user", "user");
 		String sqlPassword = Config.getConfigParam("sql.password", "secret");
@@ -473,8 +474,8 @@ public final class SqlUtils {
 			int start = pager.getPage() <= 1 ? 0 : (int) (pager.getPage() - 1) * pager.getLimit();
 			String tableName = getTableNameForAppid(appid);
 			try (PreparedStatement p = getReadPagePreparedStatement(connection, tableName)) {
-				p.setInt(useOrSqlSyntax ? 2 : 1, pager.getLimit());
-				p.setInt(useOrSqlSyntax ? 1 : 2, start);
+				p.setInt(useOrSqlSyntax || sqlUrl.endsWith(";MODE=Oracle") ? 2 : 1, pager.getLimit());
+				p.setInt(useOrSqlSyntax || sqlUrl.endsWith(";MODE=Oracle") ? 1 : 2, start);
 				try (ResultSet res = p.executeQuery()) {
 					int i = 0;
 					while (res.next()) {
@@ -552,11 +553,11 @@ public final class SqlUtils {
 
 	private static PreparedStatement getReadPagePreparedStatement(Connection conn, String tableName) throws SQLException {
 		PreparedStatement ps;
-		if (useMSSqlSyntax) {
+		if (useMSSqlSyntax || sqlUrl.endsWith(";MODE=MSSQLServer")) {
 			ps = conn.prepareStatement(Utils.formatMessage("SELECT TOP (?) * FROM (SELECT {0},{1},ROW_NUMBER() OVER "
 					+ "(ORDER BY ID ASC) AS RN FROM {2}) AS X WHERE RN > ?",
 					JSON_FIELD_NAME, JSON_UPDATES_FIELD_NAME, tableName));
-		} else if (useOrSqlSyntax) {
+		} else if (useOrSqlSyntax || sqlUrl.endsWith(";MODE=Oracle")) {
 			ps = conn.prepareStatement(Utils.formatMessage("SELECT {0},{1} FROM {2} OFFSET ? ROWS FETCH NEXT ? ROWS ONLY",
 					JSON_FIELD_NAME, JSON_UPDATES_FIELD_NAME, tableName));
 		} else {
