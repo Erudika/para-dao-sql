@@ -17,15 +17,15 @@
  */
 package com.erudika.para.server.persistence;
 
-import com.erudika.para.DestroyListener;
-import com.erudika.para.Para;
-import com.erudika.para.annotations.Locked;
+import com.erudika.para.core.listeners.DestroyListener;
+import com.erudika.para.core.utils.Para;
+import com.erudika.para.core.annotations.Locked;
 import com.erudika.para.core.App;
 import com.erudika.para.core.ParaObject;
 import com.erudika.para.core.utils.ParaObjectUtils;
-import com.erudika.para.utils.Config;
-import com.erudika.para.utils.Pager;
-import com.erudika.para.utils.Utils;
+import com.erudika.para.core.utils.Config;
+import com.erudika.para.core.utils.Pager;
+import com.erudika.para.core.utils.Utils;
 import java.io.File;
 import java.sql.Connection;
 import java.sql.PreparedStatement;

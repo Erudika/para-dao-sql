@@ -19,9 +19,9 @@ package com.erudika.para.server.persistence;
 
 import com.erudika.para.core.App;
 import com.erudika.para.core.ParaObject;
-import com.erudika.para.persistence.DAO;
-import com.erudika.para.utils.Config;
-import com.erudika.para.utils.Pager;
+import com.erudika.para.core.persistence.DAO;
+import com.erudika.para.core.utils.Config;
+import com.erudika.para.core.utils.Pager;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
