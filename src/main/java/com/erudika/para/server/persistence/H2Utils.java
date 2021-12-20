@@ -104,7 +104,7 @@ public final class H2Utils {
 			try (Connection conn = pool.getConnection(); Statement stat = conn.createStatement()) {
 				stat.execute("SHUTDOWN");
 			} catch (Exception e) {
-				logger.warn("Failed to shutdown DB server: {}", e.getMessage());
+				logger.debug("Failed to shutdown DB server: {}", e.getMessage());
 			} finally {
 				pool.dispose();
 				pool = null;
