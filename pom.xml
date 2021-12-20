@@ -189,7 +189,14 @@
 			<plugin>
 				<groupId>org.apache.maven.plugins</groupId>
 				<artifactId>maven-checkstyle-plugin</artifactId>
-				<version>3.1.0</version>
+				<version>3.1.2</version>
+				<dependencies>
+					<dependency>
+						<groupId>com.puppycrawl.tools</groupId>
+						<artifactId>checkstyle</artifactId>
+						<version>9.2</version>
+					</dependency>
+				</dependencies>
 				<executions>
 					<execution>
 						<id>validate-core</id>
@@ -239,6 +246,19 @@
 				<groupId>org.apache.maven.plugins</groupId>
 				<artifactId>maven-deploy-plugin</artifactId>
 				<version>2.8.2</version>
+			</plugin>
+
+			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-jar-plugin</artifactId>
+				<version>3.2.0</version>
+				<configuration>
+					<archive>
+						<manifestEntries>
+							<Automatic-Module-Name>com.erudika.para.server.persistence.sql</Automatic-Module-Name>
+						</manifestEntries>
+					</archive>
+				</configuration>
 			</plugin>
 		</plugins>
 	</build>

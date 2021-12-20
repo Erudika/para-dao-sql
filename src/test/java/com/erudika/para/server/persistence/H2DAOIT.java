@@ -15,8 +15,10 @@
  *
  * For issues and patches go to: https://github.com/erudika
  */
-package com.erudika.para.persistence;
+package com.erudika.para.server.persistence;
 
+import com.erudika.para.server.persistence.H2Utils;
+import com.erudika.para.server.persistence.H2DAO;
 import com.erudika.para.utils.Config;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;

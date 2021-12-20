@@ -1,4 +1,4 @@
-package com.erudika.para.persistence;
+package com.erudika.para.server.persistence;
 
 public class PostgreSQLSqlDaoIT extends SqlDAOIT {
 

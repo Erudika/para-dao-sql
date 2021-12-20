@@ -15,42 +15,42 @@
  *
  * For issues and patches go to: https://github.com/erudika
  */
-
-package com.erudika.para.persistence;
+package com.erudika.para.server.persistence;
 
 import com.erudika.para.core.App;
 import com.erudika.para.core.ParaObject;
+import com.erudika.para.persistence.DAO;
 import com.erudika.para.utils.Config;
 import com.erudika.para.utils.Pager;
+import java.util.Collections;
+import java.util.List;
+import java.util.Map;
+import javax.inject.Singleton;
 import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import javax.inject.Singleton;
-import java.util.Collections;
-import java.util.List;
-import java.util.Map;
-
 /**
- * Generic SQL DAO plugin usable with a wide range of SQL implementations.
- * @author Jeremy Wiesner [jswiesner@gmail.com]
+ * Fake DAO for in-memory persistence.
+ * Used for testing and development without a database.
+ * @author Alex Bogdanovski [alex@erudika.com]
  */
 @Singleton
-public class SqlDAO implements DAO {
+public class H2DAO implements DAO {
 
-	private static final Logger logger = LoggerFactory.getLogger(SqlDAO.class);
+	private static final Logger logger = LoggerFactory.getLogger(H2DAO.class);
 
 	static {
-		if (SqlDAO.class.getSimpleName().equals(Config.getConfigParam("dao", ""))) {
+		if (H2DAO.class.getSimpleName().equals(Config.getConfigParam("dao", ""))) {
 			// set up automatic table creation and deletion
 			App.addAppCreatedListener((App app) -> {
 				if (app != null) {
-					SqlUtils.createTable(app.getAppIdentifier());
+					H2Utils.createTable(app.getAppIdentifier());
 				}
 			});
 			App.addAppDeletedListener((App app) -> {
 				if (app != null) {
-					SqlUtils.deleteTable(app.getAppIdentifier());
+					H2Utils.deleteTable(app.getAppIdentifier());
 				}
 			});
 		}
@@ -59,7 +59,7 @@ public class SqlDAO implements DAO {
 	/**
 	 * Default constructor.
 	 */
-	public SqlDAO() {
+	public H2DAO() {
 	}
 
 	@Override
@@ -67,8 +67,8 @@ public class SqlDAO implements DAO {
 		if (object == null) {
 			return null;
 		}
-		SqlUtils.createRows(appid, Collections.singletonList(object));
-		logger.debug("SqlDAO.create() {}", object.getId());
+		H2Utils.createRows(appid, Collections.singletonList(object));
+		logger.debug("DAO.create() {}", object.getId());
 		return object.getId();
 	}
 
@@ -78,25 +78,25 @@ public class SqlDAO implements DAO {
 		if (key == null || StringUtils.isBlank(appid)) {
 			return null;
 		}
-		Map<String, P> results = SqlUtils.readRows(appid, Collections.singletonList(key));
+		Map<String, P> results = H2Utils.readRows(appid, Collections.singletonList(key));
 		P object = results.get(key);
-		logger.debug("SqlDAO.read() {} -> {}", key, object);
+		logger.debug("DAO.read() {} -> {}", key, object);
 		return object;
 	}
 
 	@Override
 	public <P extends ParaObject> void update(String appid, P object) {
 		if (object != null && !StringUtils.isBlank(appid)) {
-			SqlUtils.updateRows(appid, Collections.singletonList(object));
-			logger.debug("SqlDAO.update() {}", object.getId());
+			H2Utils.updateRows(appid, Collections.singletonList(object));
+			logger.debug("DAO.update() {}", object.getId());
 		}
 	}
 
 	@Override
 	public <P extends ParaObject> void delete(String appid, P object) {
 		if (object != null && !StringUtils.isBlank(appid)) {
-			SqlUtils.deleteRows(appid, Collections.singletonList(object));
-			logger.debug("SqlDAO.delete() {}", object.getId());
+			H2Utils.deleteRows(appid, Collections.singletonList(object));
+			logger.debug("DAO.delete() {}", object.getId());
 		}
 	}
 
@@ -105,8 +105,8 @@ public class SqlDAO implements DAO {
 		if (StringUtils.isBlank(appid) || objects == null) {
 			return;
 		}
-		SqlUtils.createRows(appid, objects);
-		logger.debug("SqlDAO.createAll() {}", objects.size());
+		H2Utils.createRows(appid, objects);
+		logger.debug("DAO.createAll() {}", objects.size());
 	}
 
 	@Override
@@ -115,32 +115,30 @@ public class SqlDAO implements DAO {
 		if (keys == null || StringUtils.isBlank(appid)) {
 			return Collections.emptyMap();
 		}
-		Map<String, P> results = SqlUtils.readRows(appid, keys);
-		logger.debug("SqlDAO.readAll() {}", results.size());
+		Map<String, P> results = H2Utils.readRows(appid, keys);
+		logger.debug("DAO.readAll() {}", results.size());
 		return results;
 	}
 
 	@Override
 	@SuppressWarnings("unchecked")
 	public <P extends ParaObject> List<P> readPage(String appid, Pager pager) {
-		List<P> results = SqlUtils.readPage(appid, pager);
-		logger.debug("SqlDAO.readPage() {}", results.size());
-		return results;
+		return H2Utils.scanRows(appid, pager);
 	}
 
 	@Override
 	public <P extends ParaObject> void updateAll(String appid, List<P> objects) {
 		if (!StringUtils.isBlank(appid) && objects != null) {
-			SqlUtils.updateRows(appid, objects);
-			logger.debug("SqlDAO.updateAll() {}", objects.size());
+			H2Utils.updateRows(appid, objects);
+			logger.debug("DAO.updateAll() {}", objects.size());
 		}
 	}
 
 	@Override
 	public <P extends ParaObject> void deleteAll(String appid, List<P> objects) {
 		if (!StringUtils.isBlank(appid) && objects != null) {
-			SqlUtils.deleteRows(appid, objects);
-			logger.debug("SqlDAO.deleteAll() {}", objects.size());
+			H2Utils.deleteRows(appid, objects);
+			logger.debug("DAO.deleteAll() {}", objects.size());
 		}
 	}
 
