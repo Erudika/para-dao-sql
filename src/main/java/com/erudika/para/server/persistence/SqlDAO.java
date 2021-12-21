@@ -26,8 +26,6 @@ import com.erudika.para.core.utils.Pager;
 import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import javax.inject.Singleton;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -36,7 +34,6 @@ import java.util.Map;
  * Generic SQL DAO plugin usable with a wide range of SQL implementations.
  * @author Jeremy Wiesner [jswiesner@gmail.com]
  */
-@Singleton
 public class SqlDAO implements DAO {
 
 	private static final Logger logger = LoggerFactory.getLogger(SqlDAO.class);

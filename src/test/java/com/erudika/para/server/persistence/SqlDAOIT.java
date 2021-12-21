@@ -17,8 +17,6 @@
  */
 package com.erudika.para.server.persistence;
 
-import com.erudika.para.server.persistence.SqlDAO;
-import com.erudika.para.server.persistence.SqlUtils;
 import org.apache.commons.lang3.StringUtils;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;

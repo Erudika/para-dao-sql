@@ -25,7 +25,6 @@ import com.erudika.para.core.utils.Pager;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
-import javax.inject.Singleton;
 import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -35,7 +34,6 @@ import org.slf4j.LoggerFactory;
  * Used for testing and development without a database.
  * @author Alex Bogdanovski [alex@erudika.com]
  */
-@Singleton
 public class H2DAO implements DAO {
 
 	private static final Logger logger = LoggerFactory.getLogger(H2DAO.class);
