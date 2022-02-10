@@ -1,5 +1,5 @@
 /*
- * Copyright 2013-2021 Erudika. https://erudika.com
+ * Copyright 2013-2022 Erudika. https://erudika.com
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,8 +20,8 @@ package com.erudika.para.server.persistence;
 import com.erudika.para.core.App;
 import com.erudika.para.core.ParaObject;
 import com.erudika.para.core.persistence.DAO;
-import com.erudika.para.core.utils.Config;
 import com.erudika.para.core.utils.Pager;
+import com.erudika.para.core.utils.Para;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -39,7 +39,7 @@ public class H2DAO implements DAO {
 	private static final Logger logger = LoggerFactory.getLogger(H2DAO.class);
 
 	static {
-		if (H2DAO.class.getSimpleName().equals(Config.getConfigParam("dao", ""))) {
+		if (H2DAO.class.getSimpleName().equals(Para.getConfig().getConfigParam("dao", ""))) {
 			// set up automatic table creation and deletion
 			App.addAppCreatedListener((App app) -> {
 				if (app != null) {
@@ -144,47 +144,47 @@ public class H2DAO implements DAO {
 
 	@Override
 	public <P extends ParaObject> String create(P object) {
-		return create(Config.getRootAppIdentifier(), object);
+		return create(Para.getConfig().getRootAppIdentifier(), object);
 	}
 
 	@Override
 	public <P extends ParaObject> P read(String key) {
-		return read(Config.getRootAppIdentifier(), key);
+		return read(Para.getConfig().getRootAppIdentifier(), key);
 	}
 
 	@Override
 	public <P extends ParaObject> void update(P object) {
-		update(Config.getRootAppIdentifier(), object);
+		update(Para.getConfig().getRootAppIdentifier(), object);
 	}
 
 	@Override
 	public <P extends ParaObject> void delete(P object) {
-		delete(Config.getRootAppIdentifier(), object);
+		delete(Para.getConfig().getRootAppIdentifier(), object);
 	}
 
 	@Override
 	public <P extends ParaObject> void createAll(List<P> objects) {
-		createAll(Config.getRootAppIdentifier(), objects);
+		createAll(Para.getConfig().getRootAppIdentifier(), objects);
 	}
 
 	@Override
 	public <P extends ParaObject> Map<String, P> readAll(List<String> keys, boolean getAllColumns) {
-		return readAll(Config.getRootAppIdentifier(), keys, getAllColumns);
+		return readAll(Para.getConfig().getRootAppIdentifier(), keys, getAllColumns);
 	}
 
 	@Override
 	public <P extends ParaObject> List<P> readPage(Pager pager) {
-		return readPage(Config.getRootAppIdentifier(), pager);
+		return readPage(Para.getConfig().getRootAppIdentifier(), pager);
 	}
 
 	@Override
 	public <P extends ParaObject> void updateAll(List<P> objects) {
-		updateAll(Config.getRootAppIdentifier(), objects);
+		updateAll(Para.getConfig().getRootAppIdentifier(), objects);
 	}
 
 	@Override
 	public <P extends ParaObject> void deleteAll(List<P> objects) {
-		deleteAll(Config.getRootAppIdentifier(), objects);
+		deleteAll(Para.getConfig().getRootAppIdentifier(), objects);
 	}
 
 }

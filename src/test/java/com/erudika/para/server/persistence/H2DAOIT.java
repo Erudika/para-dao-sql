@@ -1,5 +1,5 @@
 /*
- * Copyright 2013-2021 Erudika. https://erudika.com
+ * Copyright 2013-2022 Erudika. https://erudika.com
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,7 +17,7 @@
  */
 package com.erudika.para.server.persistence;
 
-import com.erudika.para.core.utils.Config;
+import com.erudika.para.core.utils.Para;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
 
@@ -36,7 +36,7 @@ public class H2DAOIT extends DAOTest {
 	@BeforeClass
 	public static void setUpClass() throws InterruptedException {
 		System.setProperty("para.app_name", ROOT_APP_NAME);
-		H2Utils.createTable(Config.getRootAppIdentifier());
+		H2Utils.createTable(Para.getConfig().getRootAppIdentifier());
 		H2Utils.createTable(appid1);
 		H2Utils.createTable(appid2);
 		H2Utils.createTable(appid3);
@@ -44,7 +44,7 @@ public class H2DAOIT extends DAOTest {
 
 	@AfterClass
 	public static void tearDownClass() {
-//		H2Utils.deleteTable(Config.getRootAppIdentifier());
+//		H2Utils.deleteTable(Para.getConfig().getRootAppIdentifier());
 		H2Utils.deleteTable(appid1);
 		H2Utils.deleteTable(appid2);
 		H2Utils.deleteTable(appid3);

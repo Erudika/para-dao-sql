@@ -1,5 +1,5 @@
 /*
- * Copyright 2013-2021 Erudika. https://erudika.com
+ * Copyright 2013-2022 Erudika. https://erudika.com
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -62,22 +62,22 @@ public final class H2Utils {
 	 * @return a connection instance
 	 */
 	static Connection getConnection() throws SQLException {
-		String host = Config.getConfigParam("db.hostname", "");
+		String host = Para.getConfig().getConfigParam("db.hostname", "");
 		String tcpPrefix = StringUtils.isBlank(host) ? "" : "tcp://" + host + "/";
-		String dir = Config.getConfigParam("db.dir", "./data");
-		String url = "jdbc:h2:" + tcpPrefix + dir + File.separator + Config.getRootAppIdentifier();
-		String user = Config.getConfigParam("db.user", Config.getRootAppIdentifier());
-		String pass = Config.getConfigParam("db.password", "secret");
+		String dir = Para.getConfig().getConfigParam("db.dir", "./data");
+		String url = "jdbc:h2:" + tcpPrefix + dir + File.separator + Para.getConfig().getRootAppIdentifier();
+		String user = Para.getConfig().getConfigParam("db.user", Para.getConfig().getRootAppIdentifier());
+		String pass = Para.getConfig().getConfigParam("db.password", "secret");
 		try {
 			if (server == null) {
 				org.h2.Driver.load();
-				String serverParams = Config.getConfigParam("db.tcpServer", tcpPrefix.isEmpty() ? "-baseDir " + dir : "");
+				String serverParams = Para.getConfig().getConfigParam("db.tcpServer", tcpPrefix.isEmpty() ? "-baseDir " + dir : "");
 				String[] params = StringUtils.split(serverParams, ' ');
 				server = Server.createTcpServer(params);
 				server.start();
 
-				if (!existsTable(Config.getRootAppIdentifier())) {
-					createTable(Config.getRootAppIdentifier());
+				if (!existsTable(Para.getConfig().getRootAppIdentifier())) {
+					createTable(Para.getConfig().getRootAppIdentifier());
 				}
 
 				Para.addDestroyListener(new DestroyListener() {
@@ -472,7 +472,7 @@ public final class H2Utils {
 	}
 
 	private static void throwIfNecessary(Throwable t) {
-		if (t != null && Config.getConfigBoolean("fail_on_write_errors", true)) {
+		if (t != null && Para.getConfig().getConfigBoolean("fail_on_write_errors", true)) {
 			throw new RuntimeException("DAO write operation failed!", t);
 		}
 	}

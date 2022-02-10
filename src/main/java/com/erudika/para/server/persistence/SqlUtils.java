@@ -1,5 +1,5 @@
 /*
- * Copyright 2013-2021 Erudika. https://erudika.com
+ * Copyright 2013-2022 Erudika. https://erudika.com
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -74,15 +74,15 @@ public final class SqlUtils {
 			return hikariDataSource.getConnection();
 		}
 
-		sqlUrl = Config.getConfigParam("sql.url", null);
-		String sqlDriver = Config.getConfigParam("sql.driver", null);
-		String sqlUser = Config.getConfigParam("sql.user", "user");
-		String sqlPassword = Config.getConfigParam("sql.password", "secret");
+		sqlUrl = Para.getConfig().getConfigParam("sql.url", null);
+		String sqlDriver = Para.getConfig().getConfigParam("sql.driver", null);
+		String sqlUser = Para.getConfig().getConfigParam("sql.user", "user");
+		String sqlPassword = Para.getConfig().getConfigParam("sql.password", "secret");
 
 		if (StringUtils.isBlank(sqlUrl)) {
 			logger.error("Missing required configuration parameter \"para.sql.url\" for the SqlDAO");
 		}
-		if (Config.getConfigParam("sql.driver", null) == null) {
+		if (Para.getConfig().getConfigParam("sql.driver", null) == null) {
 			logger.error("Missing required configuration parameter \"para.sql.driver\" for the SqlDAO");
 		}
 
@@ -116,8 +116,8 @@ public final class SqlUtils {
 		hikariConfig.setDriverClassName(sqlDriver);
 		hikariDataSource = new HikariDataSource(hikariConfig);
 
-		if (!existsTable(Config.getRootAppIdentifier())) {
-			createTable(Config.getRootAppIdentifier());
+		if (!existsTable(Para.getConfig().getRootAppIdentifier())) {
+			createTable(Para.getConfig().getRootAppIdentifier());
 		}
 
 		Para.addDestroyListener(new DestroyListener() {
@@ -568,7 +568,7 @@ public final class SqlUtils {
 	}
 
 	private static void throwIfNecessary(Throwable t) {
-		if (t != null && Config.getConfigBoolean("fail_on_write_errors", true)) {
+		if (t != null && Para.getConfig().getConfigBoolean("fail_on_write_errors", true)) {
 			throw new RuntimeException("DAO write operation failed!", t);
 		}
 	}
