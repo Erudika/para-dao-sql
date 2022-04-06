@@ -73,15 +73,15 @@ public final class SqlUtils {
 			return hikariDataSource.getConnection();
 		}
 
-		sqlUrl = Para.getConfig().getConfigParam("sql.url", null);
-		String sqlDriver = Para.getConfig().getConfigParam("sql.driver", null);
-		String sqlUser = Para.getConfig().getConfigParam("sql.user", "user");
-		String sqlPassword = Para.getConfig().getConfigParam("sql.password", "secret");
+		sqlUrl = Para.getConfig().sqlHostUrl();
+		String sqlDriver = Para.getConfig().sqlDriver();
+		String sqlUser = Para.getConfig().sqlUser();
+		String sqlPassword = Para.getConfig().sqlPassword();
 
 		if (StringUtils.isBlank(sqlUrl)) {
 			logger.error("Missing required configuration parameter \"para.sql.url\" for the SqlDAO");
 		}
-		if (Para.getConfig().getConfigParam("sql.driver", null) == null) {
+		if (Para.getConfig().sqlDriver() == null) {
 			logger.error("Missing required configuration parameter \"para.sql.driver\" for the SqlDAO");
 		}
 
@@ -567,7 +567,7 @@ public final class SqlUtils {
 	}
 
 	private static void throwIfNecessary(Throwable t) {
-		if (t != null && Para.getConfig().getConfigBoolean("fail_on_write_errors", true)) {
+		if (t != null && Para.getConfig().exceptionOnWriteErrorsEnabled()) {
 			throw new RuntimeException("DAO write operation failed!", t);
 		}
 	}

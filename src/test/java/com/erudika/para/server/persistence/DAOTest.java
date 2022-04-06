@@ -18,23 +18,21 @@
 package com.erudika.para.server.persistence;
 
 import com.erudika.para.core.App;
-import com.erudika.para.core.utils.CoreUtils;
 import com.erudika.para.core.Sysprop;
 import com.erudika.para.core.Tag;
 import com.erudika.para.core.User;
 import com.erudika.para.core.persistence.DAO;
 import com.erudika.para.core.search.Search;
+import com.erudika.para.core.utils.CoreUtils;
 import com.erudika.para.core.utils.Pager;
 import com.erudika.para.core.utils.Utils;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Map;
-
 import static org.junit.Assert.*;
 import org.junit.Before;
 import org.junit.Ignore;
 import org.junit.Test;
-
 import static org.mockito.Mockito.*;
 /**
  *
@@ -124,6 +122,7 @@ public abstract class DAOTest {
 
 		dao.delete(u);
 		dao.delete(t);
+		dao.delete(app);
 	}
 
 	@Test

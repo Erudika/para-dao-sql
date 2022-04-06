@@ -39,7 +39,7 @@ public class H2DAO implements DAO {
 	private static final Logger logger = LoggerFactory.getLogger(H2DAO.class);
 
 	static {
-		if (H2DAO.class.getSimpleName().equals(Para.getConfig().getConfigParam("dao", ""))) {
+		if (H2DAO.class.getSimpleName().equals(Para.getConfig().daoPlugin())) {
 			// set up automatic table creation and deletion
 			App.addAppCreatedListener((App app) -> {
 				if (app != null) {

@@ -62,16 +62,16 @@ public final class H2Utils {
 	 * @return a connection instance
 	 */
 	static Connection getConnection() throws SQLException {
-		String host = Para.getConfig().getConfigParam("db.hostname", "");
+		String host = Para.getConfig().h2Host();
 		String tcpPrefix = StringUtils.isBlank(host) ? "" : "tcp://" + host + "/";
-		String dir = Para.getConfig().getConfigParam("db.dir", "./data");
+		String dir = Para.getConfig().h2DataFolder();
 		String url = "jdbc:h2:" + tcpPrefix + dir + File.separator + Para.getConfig().getRootAppIdentifier();
-		String user = Para.getConfig().getConfigParam("db.user", Para.getConfig().getRootAppIdentifier());
-		String pass = Para.getConfig().getConfigParam("db.password", "secret");
+		String user = Para.getConfig().h2User();
+		String pass = Para.getConfig().h2Password();
 		try {
 			if (server == null) {
 				org.h2.Driver.load();
-				String serverParams = Para.getConfig().getConfigParam("db.tcpServer", tcpPrefix.isEmpty() ? "-baseDir " + dir : "");
+				String serverParams = Para.getConfig().h2ServerParameters();
 				String[] params = StringUtils.split(serverParams, ' ');
 				server = Server.createTcpServer(params);
 				server.start();
@@ -472,7 +472,7 @@ public final class H2Utils {
 	}
 
 	private static void throwIfNecessary(Throwable t) {
-		if (t != null && Para.getConfig().getConfigBoolean("fail_on_write_errors", true)) {
+		if (t != null && Para.getConfig().exceptionOnWriteErrorsEnabled()) {
 			throw new RuntimeException("DAO write operation failed!", t);
 		}
 	}

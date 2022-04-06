@@ -23,12 +23,12 @@ import com.erudika.para.core.ParaObject;
 import com.erudika.para.core.persistence.DAO;
 import com.erudika.para.core.utils.Pager;
 import com.erudika.para.core.utils.Para;
-import org.apache.commons.lang3.StringUtils;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import org.apache.commons.lang3.StringUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Generic SQL DAO plugin usable with a wide range of SQL implementations.
@@ -39,7 +39,7 @@ public class SqlDAO implements DAO {
 	private static final Logger logger = LoggerFactory.getLogger(SqlDAO.class);
 
 	static {
-		if (SqlDAO.class.getSimpleName().equals(Para.getConfig().getConfigParam("dao", ""))) {
+		if (SqlDAO.class.getSimpleName().equals(Para.getConfig().daoPlugin())) {
 			// set up automatic table creation and deletion
 			App.addAppCreatedListener((App app) -> {
 				if (app != null) {
