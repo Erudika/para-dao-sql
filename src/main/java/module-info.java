@@ -19,6 +19,7 @@
 module com.erudika.para.server.persistence.sql {
 	requires com.erudika.para.core;
 	requires org.apache.commons.lang3;
+	requires com.fasterxml.jackson.core;
 	requires com.fasterxml.jackson.databind;
 	requires com.h2database;
 	requires org.slf4j;
