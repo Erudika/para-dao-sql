@@ -18,8 +18,8 @@
 package com.erudika.para.server.persistence;
 
 import com.erudika.para.core.utils.Para;
-import org.junit.AfterClass;
-import org.junit.BeforeClass;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeAll;
 
 /**
  *
@@ -33,7 +33,7 @@ public class H2DAOIT extends DAOTest {
 		super(new H2DAO());
 	}
 
-	@BeforeClass
+	@BeforeAll
 	public static void setUpClass() throws InterruptedException {
 		System.setProperty("para.app_name", ROOT_APP_NAME);
 		H2Utils.createTable(Para.getConfig().getRootAppIdentifier());
@@ -42,7 +42,7 @@ public class H2DAOIT extends DAOTest {
 		H2Utils.createTable(appid3);
 	}
 
-	@AfterClass
+	@AfterAll
 	public static void tearDownClass() {
 //		H2Utils.deleteTable(Para.getConfig().getRootAppIdentifier());
 		H2Utils.deleteTable(appid1);

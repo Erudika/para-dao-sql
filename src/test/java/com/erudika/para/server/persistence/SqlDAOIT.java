@@ -18,18 +18,17 @@
 package com.erudika.para.server.persistence;
 
 import org.apache.commons.lang3.StringUtils;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertTrue;
-
-import org.junit.AfterClass;
-import org.junit.Ignore;
-import org.junit.Test;
+import org.junit.jupiter.api.AfterAll;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import org.junit.jupiter.api.Disabled;
+import org.junit.jupiter.api.Test;
 
 /**
  * Perform an integration test of the generic SQL DAO using a specific mode.
  * @author Jeremy Wiesner [jswiesner@gmail.com]
  */
-@Ignore
+@Disabled
 public abstract class SqlDAOIT extends DAOTest {
 
 	private static final String ROOT_APP_NAME = "para-test";
@@ -51,7 +50,7 @@ public abstract class SqlDAOIT extends DAOTest {
 		SqlUtils.createTable(appid3);
 	}
 
-	@AfterClass
+	@AfterAll
 	public static void destroy() {
 		SqlUtils.deleteTable(ROOT_APP_NAME);
 		SqlUtils.deleteTable(appid1);
