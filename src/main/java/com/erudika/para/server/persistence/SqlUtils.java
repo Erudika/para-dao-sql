@@ -31,6 +31,7 @@ import com.zaxxer.hikari.HikariConfig;
 import com.zaxxer.hikari.HikariDataSource;
 import java.sql.Connection;
 import java.sql.DriverManager;
+import java.sql.NClob;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
@@ -362,7 +363,13 @@ public final class SqlUtils {
 					} else {
 						ps.setNull(3, Types.NULL);
 					}
-					ps.setString(4, objectJson);
+					if (useOrSqlSyntax) {
+						NClob clob = connection.createNClob();
+						clob.setString(1, objectJson);
+						ps.setClob(4, clob);
+					} else {
+						ps.setString(4, objectJson);
+					}
 
 					if (useMySqlSyntax || usePGSqlSyntax || useLiSqlSyntax) {
 						ps.setString(5, object.getType());
@@ -408,7 +415,14 @@ public final class SqlUtils {
 					if (object != null && !StringUtils.isBlank(object.getId())) {
 						object.setUpdated(Utils.timestamp());
 						Map<String, Object> data = ParaObjectUtils.getAnnotatedFields(object, Locked.class, false);
-						ps.setString(1, ParaObjectUtils.getJsonWriterNoIdent().writeValueAsString(data));
+						String objectJson = ParaObjectUtils.getJsonWriterNoIdent().writeValueAsString(data);
+						if (useOrSqlSyntax) {
+							NClob clob = connection.createNClob();
+							clob.setString(1, objectJson);
+							ps.setClob(1, clob);
+						} else {
+							ps.setString(1, objectJson);
+						}
 						ps.setString(2, object.getId());
 						ps.addBatch();
 					}
