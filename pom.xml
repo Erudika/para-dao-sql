@@ -67,7 +67,7 @@
 		<dependency>
 			<groupId>com.erudika</groupId>
 			<artifactId>para-core</artifactId>
-			<version>1.50.0</version>
+			<version>1.50.1</version>
 			<scope>provided</scope>
 		</dependency>
 
@@ -89,7 +89,7 @@
 		<dependency>
 			<groupId>org.xerial</groupId>
 			<artifactId>sqlite-jdbc</artifactId>
-			<version>3.45.3.0</version>
+			<version>3.46.0.0</version>
 		</dependency>
 
 		<!-- TESTING -->
