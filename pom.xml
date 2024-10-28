@@ -46,7 +46,7 @@
 
 	<scm>
 		<connection>scm:git:https://github.com/erudika/para-dao-sql.git</connection>
-		<developerConnection>scm:git:git@github.com:erudika/para-dao-sql.git</developerConnection>
+		<developerConnection>scm:git:https://github.com/erudika/para-dao-sql.git</developerConnection>
 		<url>https://github.com/erudika/para-dao-sql</url>
 		<tag>HEAD</tag>
 	</scm>
