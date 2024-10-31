@@ -67,7 +67,7 @@
 		<dependency>
 			<groupId>com.erudika</groupId>
 			<artifactId>para-core</artifactId>
-			<version>1.50.2</version>
+			<version>1.50.3</version>
 			<scope>provided</scope>
 		</dependency>
 
@@ -225,7 +225,6 @@
 					<mavenExecutorId>forked-path</mavenExecutorId>
 					<tagNameFormat>@{project.version}</tagNameFormat>
 					<preparationGoals>clean</preparationGoals>
-					<useReleaseProfile>false</useReleaseProfile>
 					<releaseProfiles>release</releaseProfiles>
 				</configuration>
 			</plugin>
@@ -301,7 +300,6 @@
 								<configuration>
 									<stylesheetfile>src/main/javadoc/stylesheet.css</stylesheetfile>
 									<show>public</show>
-									<aggregate>true</aggregate>
 									<quiet>true</quiet>
 									<docfilessubdirs>true</docfilessubdirs>
 								</configuration>
