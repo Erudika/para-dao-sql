@@ -67,7 +67,7 @@
 		<dependency>
 			<groupId>com.erudika</groupId>
 			<artifactId>para-core</artifactId>
-			<version>1.51.0</version>
+			<version>1.51.3</version>
 			<scope>provided</scope>
 		</dependency>
 
@@ -89,7 +89,7 @@
 		<dependency>
 			<groupId>org.xerial</groupId>
 			<artifactId>sqlite-jdbc</artifactId>
-			<version>3.50.3.0</version>
+			<version>3.51.0.0</version>
 		</dependency>
 
 		<!-- TESTING -->
@@ -102,13 +102,13 @@
 		<dependency>
 			<groupId>org.junit.jupiter</groupId>
 			<artifactId>junit-jupiter-api</artifactId>
-			<version>6.0.0</version>
+			<version>6.0.1</version>
 			<scope>test</scope>
 		</dependency>
 		<dependency>
 			<groupId>org.junit.jupiter</groupId>
 			<artifactId>junit-jupiter-engine</artifactId>
-			<version>6.0.0</version>
+			<version>6.0.1</version>
 			<scope>test</scope>
 		</dependency>
 		<dependency>

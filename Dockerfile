@@ -1,8 +1,4 @@
-FROM eclipse-temurin:21-alpine
-
-RUN mkdir -p /para/lib
-
-WORKDIR /para
+FROM alpine
 
 ENV PARA_PLUGIN_ID="para-dao-sql" \
 	PARA_PLUGIN_VER="1.49.1"
