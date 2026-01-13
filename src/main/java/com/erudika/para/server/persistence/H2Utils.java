@@ -288,7 +288,7 @@ public final class H2Utils {
 			Map<String, P> results = new LinkedHashMap<>();
 			for (int i = 0; i < ids.size(); i++) {
 				ps.setString(i + 1, ids.get(i));
-				results.put(ids.get(i), null);
+				//results.put(ids.get(i), null);
 			}
 			try (ResultSet res = ps.executeQuery()) {
 				while (res.next()) {

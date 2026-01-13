@@ -15,7 +15,9 @@
  *
  * For issues and patches go to: https://github.com/erudika
  */
-
+/**
+ * Para SQL Plugin.
+ */
 module com.erudika.para.server.persistence.sql {
 	requires com.erudika.para.core;
 	requires org.apache.commons.lang3;
@@ -25,7 +27,6 @@ module com.erudika.para.server.persistence.sql {
 	requires org.slf4j;
 	requires java.sql;
 	requires com.zaxxer.hikari;
-	exports com.erudika.para.server.persistence;
 	provides com.erudika.para.core.persistence.DAO with
 			com.erudika.para.server.persistence.SqlDAO,
 			com.erudika.para.server.persistence.H2DAO;
