@@ -1,4 +1,4 @@
-FROM alpine
+FROM scratch
 
 ENV PARA_PLUGIN_ID="para-dao-sql" \
 	PARA_PLUGIN_VER="1.50.0"
